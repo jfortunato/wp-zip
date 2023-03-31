@@ -15,6 +15,14 @@ type SSHCredentials struct {
 	Port string
 }
 
+// Client Our Client interface is a wrapper around the pkg/sftp Client
+// so that we can require it to implement only a subset of the
+// methods that we actually need.
+//type Client interface {
+//	ReadFileToString(path string) (string, error)
+//	Close() error
+//}
+
 // ClientWrapper Our ClientWrapper is a wrapper around the pkg/sftp Client
 // that only exposes the methods that we actually need.
 type ClientWrapper struct {
