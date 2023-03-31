@@ -1,0 +1,84 @@
+package packager
+
+import (
+	"fmt"
+	"github.com/jfortunato/wp-zip/internal/sftp"
+	"log"
+	"regexp"
+)
+
+// PackageWP is the main function that packages a WordPress site into a zip file
+func PackageWP(credentials sftp.SSHCredentials, publicPath string) {
+	// Ensure the publicPath ends with a slash
+	if publicPath[len(publicPath)-1:] != "/" {
+		publicPath += "/"
+	}
+
+	// Assert that we can connect and the wp-config.php file exists under the publicPath
+	// by reading it into a local string
+	client, contents, err := setupClientAndReadWpConfig(credentials, publicPath+"wp-config.php")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer client.Close()
+
+	// Parse the wp-config.php file for the database credentials
+	fields, err := parseWpConfig(contents)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	fmt.Println(fields)
+}
+
+// This function isolates the sftp connection setup and ensures that a WordPress wp-config.php file
+// exists at the specified path. It will return both the sftp client and the contents of the wp-config.php
+// for convenience to use in the caller.
+func setupClientAndReadWpConfig(credentials sftp.SSHCredentials, pathToWpConfig string) (*sftp.ClientWrapper, string, error) {
+	client, err := sftp.NewClient(credentials)
+	if err != nil {
+		return nil, "", err
+	}
+
+	// Read the wp-config file
+	contents, err := client.ReadFileToString(pathToWpConfig)
+	if err != nil {
+		client.Close()
+		return nil, "", err
+	}
+
+	return client, contents, nil
+}
+
+type wpConfigFields struct {
+	dbName string
+	dbUser string
+	dbPass string
+}
+
+func parseWpConfig(contents string) (wpConfigFields, error) {
+	fields := map[string]string{
+		"DB_NAME":     "",
+		"DB_USER":     "",
+		"DB_PASSWORD": "",
+	}
+
+	for field := range fields {
+		value, err := parseWpConfigField(contents, field)
+		if err != nil {
+			return wpConfigFields{}, err
+		}
+		fields[field] = value
+	}
+
+	return wpConfigFields{fields["DB_NAME"], fields["DB_USER"], fields["DB_PASSWORD"]}, nil
+}
+
+func parseWpConfigField(contents, field string) (string, error) {
+	re := regexp.MustCompile(`define\(['"]` + field + `['"], ['"](.*)['"]\);`)
+	matches := re.FindStringSubmatch(contents)
+	if len(matches) != 2 {
+		return "", fmt.Errorf("could not parse %s from wp-config.php", field)
+	}
+	return matches[1], nil
+}
