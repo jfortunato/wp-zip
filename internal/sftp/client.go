@@ -3,6 +3,7 @@ package sftp
 import (
 	"archive/tar"
 	"bytes"
+	"errors"
 	_sftp "github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"io"
@@ -79,25 +80,50 @@ func (c *ClientWrapper) ReadFileToString(path string) (string, error) {
 	return b.String(), nil
 }
 
+func (c *ClientWrapper) ExportDatabaseToFile(dbUser, dbPass, dbName string, filename string) error {
+	if !c.canRunRemoteCommand("mysqldump --version") {
+		return errors.New("mysqldump not found on remote server")
+	}
+
+	sess, err := c.conn.NewSession()
+	if err != nil {
+		return err
+	}
+	defer sess.Close()
+
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	sess.Stdout = file
+
+	err = sess.Run("mysqldump --no-tablespaces -u " + dbUser + " -p" + dbPass + " " + dbName)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (c *ClientWrapper) DownloadDirectory(remoteDirectory string, localDirectory string) error {
 	// First see if we can use the tar client, then fall back to the sftp client
-	if c.canRunRemoteTarCommand() {
+	if c.canRunRemoteCommand("tar --version") {
 		return c.downloadDirectoryWithTar(remoteDirectory, localDirectory)
 	} else {
 		return c.downloadDirectoryWithSftp(remoteDirectory, localDirectory)
 	}
 }
 
-func (c *ClientWrapper) canRunRemoteTarCommand() bool {
-	// Check if the tar command exists
+func (c *ClientWrapper) canRunRemoteCommand(cmd string) bool {
 	sess, err := c.conn.NewSession()
 	if err != nil {
 		return false
 	}
 	defer sess.Close()
 
-	// Check that the remote session can successfully run "tar --version"
-	err = sess.Run("tar --version")
+	// Check that the remote session can successfully run the command
+	err = sess.Run(cmd)
 	if err != nil {
 		return false
 	}

@@ -25,8 +25,6 @@ func PackageWP(credentials sftp.SSHCredentials, publicPath string) {
 		log.Fatalln(err)
 	}
 
-	fmt.Println(fields)
-
 	// Create a temporary directory to store the files
 	directory, err := os.MkdirTemp("", "wp-zip-")
 	if err != nil {
@@ -42,6 +40,18 @@ func PackageWP(credentials sftp.SSHCredentials, publicPath string) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	databaseDirectory := filepath.Join(directory, "database")
+	os.Mkdir(databaseDirectory, 0755)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	log.Println("Copying database to temporary directory: " + databaseDirectory)
+	err = client.ExportDatabaseToFile(fields.dbUser, fields.dbPass, fields.dbName, filepath.Join(databaseDirectory, "database.sql"))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	log.Println("Finished")
 }
 
