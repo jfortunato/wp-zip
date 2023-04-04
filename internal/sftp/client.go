@@ -4,14 +4,18 @@ import (
 	"archive/tar"
 	"bytes"
 	"errors"
+	"fmt"
 	_sftp "github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"io"
 	"log"
+	"math/rand"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type SSHCredentials struct {
@@ -78,6 +82,73 @@ func (c *ClientWrapper) ReadFileToString(path string) (string, error) {
 	}
 
 	return b.String(), nil
+}
+
+func (c *ClientWrapper) GenerateJsonFile(dbUser, dbPass, dbName, publicUrl, publicPath, filename string) error {
+	contents := fmt.Sprintf(`<?php
+
+// Connect to mysql and get the mysql version
+$link = mysqli_connect('localhost', '%s', '%s', '%s');
+$mysqlVersion = mysqli_get_server_info($link);
+mysqli_close($link);
+
+// Get the server name and version
+preg_match('/^(apache|nginx)\/(\d+\.\d+\.\d+).*/', strtolower($_SERVER['SERVER_SOFTWARE']), $matches);
+$serverJson = isset($matches[1], $matches[2]) ? [ $matches[1] => [ 'name' => $matches[1], 'version' => $matches[2] ] ] : '';
+
+// Get the current WordPress version by reading the wp-includes/version.php file
+$wpVersionFile = file_get_contents(__DIR__ . DIRECTORY_SEPARATOR . 'wp-includes' . DIRECTORY_SEPARATOR .  'version.php');
+preg_match('/\$wp_version = \'(.*)\';/', $wpVersionFile, $matches);
+$wpVersion = isset($matches[1]) ? $matches[1] : '';
+
+header('Content-Type: application/json');
+echo json_encode(array_merge_recursive([
+    'name' => 'Migrated Site',
+    'domain' => '%s',
+    'path' => '%s',
+    'wpVersion' => $wpVersion,
+    'services' => [
+        'php' => [
+            'name' => 'php',
+            'version' => PHP_VERSION,
+        ],
+        'mysql' => [
+            'name' => 'mysql',
+            'version' => $mysqlVersion,
+        ],
+    ],
+], ['services' => $serverJson]));
+`, dbUser, dbPass, dbName, publicUrl, publicPath)
+
+	// Generate a random filename
+	uploadFilename := "wp-zip-" + randSeq(10) + ".php"
+
+	// Upload the contents to the server
+	// Assuming a Unix server with a "/" path separator
+	err := c.uploadContentsToFile(strings.NewReader(contents), publicPath+"/"+uploadFilename)
+	if err != nil {
+		return err
+	}
+	defer c.deleteFile(publicPath + "/" + uploadFilename)
+
+	// Make a request to the file to get the JSON
+	body, err := readHttpResonseToString(publicUrl + "/" + uploadFilename)
+	if err != nil {
+		return err
+	}
+
+	// Write the body to a json string
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = io.Copy(f, strings.NewReader(body))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *ClientWrapper) ExportDatabaseToFile(dbUser, dbPass, dbName string, filename string) error {
@@ -241,7 +312,7 @@ func (c *ClientWrapper) downloadDirectoryWithSftp(remoteDirectory string, localD
 	return nil
 }
 
-func (c *ClientWrapper) downloadFile(remoteFile string, localFile string) error {
+func (c *ClientWrapper) downloadFile(remoteFile, localFile string) error {
 	r, err := c.wrapper.Open(remoteFile)
 	if err != nil {
 		return err
@@ -263,6 +334,64 @@ func (c *ClientWrapper) downloadFile(remoteFile string, localFile string) error 
 	}
 
 	return nil
+}
+
+func (c *ClientWrapper) deleteFile(remoteFile string) error {
+	err := c.wrapper.Remove(remoteFile)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *ClientWrapper) uploadContentsToFile(contents io.Reader, remoteFile string) error {
+	w, err := c.wrapper.Create(remoteFile)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+
+	// Copy the contents
+	log.Println("Uploading contents")
+	_, err = io.Copy(w, contents)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func randSeq(n int) string {
+	rand.Seed(time.Now().UnixNano())
+	//r := rand.New(rand.NewSource(time.Now().UnixNano())
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
+
+func readHttpResonseToString(url string) (string, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	// Read the response body
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
 }
 
 func (c *ClientWrapper) Close() error {

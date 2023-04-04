@@ -10,7 +10,7 @@ import (
 )
 
 // PackageWP is the main function that packages a WordPress site into a zip file
-func PackageWP(credentials sftp.SSHCredentials, publicPath string) {
+func PackageWP(credentials sftp.SSHCredentials, publicUrl, publicPath string) {
 	// Assert that we can connect and the wp-config.php file exists under the publicPath
 	// by reading it into a local string
 	client, contents, err := setupClientAndReadWpConfig(credentials, filepath.Join(publicPath, "wp-config.php"))
@@ -48,6 +48,13 @@ func PackageWP(credentials sftp.SSHCredentials, publicPath string) {
 	}
 	log.Println("Copying database to temporary directory: " + databaseDirectory)
 	err = client.ExportDatabaseToFile(fields.dbUser, fields.dbPass, fields.dbName, filepath.Join(databaseDirectory, "database.sql"))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	log.Println("Generating JSON file")
+	publicUrl = fmt.Sprintf("https://%s", publicUrl)
+	err = client.GenerateJsonFile(fields.dbUser, fields.dbPass, fields.dbName, publicUrl, publicPath, filepath.Join(directory, "wpmigrate-export.json"))
 	if err != nil {
 		log.Fatalln(err)
 	}

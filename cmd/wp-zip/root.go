@@ -13,6 +13,7 @@ var Host string
 var Username string
 var Password string
 var Port string
+var Domain string
 
 func init() {
 	// Override the help command to disable the shorthand -h, as it is used for the --host instead
@@ -21,15 +22,17 @@ func init() {
 	rootCmd.Flags().StringVarP(&Username, "username", "u", "", "SFTP username (required)")
 	rootCmd.Flags().StringVarP(&Password, "password", "p", "", "SFTP password (required)")
 	rootCmd.Flags().StringVarP(&Port, "port", "P", "22", "SFTP port")
+	rootCmd.Flags().StringVarP(&Domain, "domain", "d", "", "Domain name of the live site")
 	rootCmd.MarkFlagRequired("host")
 	rootCmd.MarkFlagRequired("username")
 	// TODO: Make this optional, and prompt for it if not provided
 	rootCmd.MarkFlagRequired("password")
+	rootCmd.MarkFlagRequired("domain")
 
 }
 
 var rootCmd = &cobra.Command{
-	Use:     "wp-zip -h sftp-host -u sftp-username -p sftp-password [flags] PATH_TO_PUBLIC",
+	Use:     "wp-zip -h sftp-host -u sftp-username -p sftp-password -d example.com [flags] PATH_TO_PUBLIC",
 	Version: "0.0.1",
 	Short:   "Export an existing WordPress site to a zip file",
 	Long: `Generate a complete archive of a WordPress site's files
@@ -37,7 +40,7 @@ var rootCmd = &cobra.Command{
 	to another host or to create a local development environment.`,
 	Args: argsValidation(),
 	Run: func(cmd *cobra.Command, args []string) {
-		packager.PackageWP(sftp.SSHCredentials{User: Username, Pass: Password, Host: Host, Port: Port}, args[0])
+		packager.PackageWP(sftp.SSHCredentials{User: Username, Pass: Password, Host: Host, Port: Port}, Domain, args[0])
 	},
 }
 
