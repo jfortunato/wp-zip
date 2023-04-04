@@ -1,11 +1,16 @@
 package sftp
 
 import (
+	"archive/tar"
 	"bytes"
 	_sftp "github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"io"
+	"log"
 	"net"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 type SSHCredentials struct {
@@ -72,6 +77,166 @@ func (c *ClientWrapper) ReadFileToString(path string) (string, error) {
 	}
 
 	return b.String(), nil
+}
+
+func (c *ClientWrapper) DownloadDirectory(remoteDirectory string, localDirectory string) error {
+	// First see if we can use the tar client, then fall back to the sftp client
+	if c.canRunRemoteTarCommand() {
+		return c.downloadDirectoryWithTar(remoteDirectory, localDirectory)
+	} else {
+		return c.downloadDirectoryWithSftp(remoteDirectory, localDirectory)
+	}
+}
+
+func (c *ClientWrapper) canRunRemoteTarCommand() bool {
+	// Check if the tar command exists
+	sess, err := c.conn.NewSession()
+	if err != nil {
+		return false
+	}
+	defer sess.Close()
+
+	// Check that the remote session can successfully run "tar --version"
+	err = sess.Run("tar --version")
+	if err != nil {
+		return false
+	}
+
+	return true
+}
+
+func (c *ClientWrapper) downloadDirectoryWithTar(remoteDirectory string, localDirectory string) error {
+	// We'll pipe the remote tar output directly into the tar reader
+	reader, writer := io.Pipe()
+	defer reader.Close()
+	defer writer.Close()
+
+	sess, err := c.conn.NewSession()
+	if err != nil {
+		return err
+	}
+	sess.Stdout = writer
+	defer sess.Close()
+
+	go func() {
+		err := sess.Run("tar -C " + remoteDirectory + " -cf - .")
+		if err != nil {
+			log.Println(err)
+		}
+	}()
+
+	tr := tar.NewReader(reader)
+	err = untarToDirectory(localDirectory, tr)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func untarToDirectory(localDirectory string, tr *tar.Reader) error {
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		// Remove any trailing slashes
+		header.Name = strings.TrimSuffix(header.Name, "/")
+		// Split the path into its components
+		paths := strings.Split(header.Name, "/")
+		// Ignore the first path (name should be something like "./foo, so disregard the ".)
+		paths = paths[1:]
+		// Don't do anything for the top level directory
+		if len(paths) == 0 {
+			continue
+		}
+		// Prefix the path with the local directory
+		paths = append([]string{localDirectory}, paths...)
+
+		targetPath := filepath.Join(paths...)
+
+		// Check if the file is a directory or a regular file
+		if header.FileInfo().IsDir() {
+			// Create the directory
+			err = os.Mkdir(targetPath, 0755)
+			if err != nil {
+				return err
+			}
+		} else {
+			// Create the file
+			f, _ := os.Create(targetPath)
+			_, err = io.Copy(f, tr)
+			if err != nil {
+				return err
+			}
+			f.Close()
+		}
+	}
+
+	return nil
+}
+
+func (c *ClientWrapper) downloadDirectoryWithSftp(remoteDirectory string, localDirectory string) error {
+	// Get the list of files in the remote directory
+	remoteFiles, err := c.wrapper.ReadDir(remoteDirectory)
+	if err != nil {
+		return err
+	}
+	for _, remoteFile := range remoteFiles {
+		remoteFilepath := filepath.Join(remoteDirectory, remoteFile.Name())
+		localFilepath := filepath.Join(localDirectory, remoteFile.Name())
+
+		// If the file is a directory, recursively download it
+		if remoteFile.IsDir() {
+			// Create the local directory
+			err = os.Mkdir(localFilepath, 0755)
+			if err != nil {
+				return err
+			}
+
+			// Recursively download the directory
+			err = c.DownloadDirectory(remoteFilepath, localFilepath)
+			if err != nil {
+				return err
+			}
+		} else {
+			// Otherwise, download the file
+			err = c.downloadFile(remoteFilepath, localFilepath)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *ClientWrapper) downloadFile(remoteFile string, localFile string) error {
+	r, err := c.wrapper.Open(remoteFile)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	// Create the local file
+	w, err := os.Create(localFile)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+
+	// Copy the file
+	log.Println("Downloading " + remoteFile)
+	_, err = w.ReadFrom(r)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *ClientWrapper) Close() error {

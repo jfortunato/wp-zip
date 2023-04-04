@@ -4,19 +4,16 @@ import (
 	"fmt"
 	"github.com/jfortunato/wp-zip/internal/sftp"
 	"log"
+	"os"
+	"path/filepath"
 	"regexp"
 )
 
 // PackageWP is the main function that packages a WordPress site into a zip file
 func PackageWP(credentials sftp.SSHCredentials, publicPath string) {
-	// Ensure the publicPath ends with a slash
-	if publicPath[len(publicPath)-1:] != "/" {
-		publicPath += "/"
-	}
-
 	// Assert that we can connect and the wp-config.php file exists under the publicPath
 	// by reading it into a local string
-	client, contents, err := setupClientAndReadWpConfig(credentials, publicPath+"wp-config.php")
+	client, contents, err := setupClientAndReadWpConfig(credentials, filepath.Join(publicPath, "wp-config.php"))
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -29,6 +26,23 @@ func PackageWP(credentials sftp.SSHCredentials, publicPath string) {
 	}
 
 	fmt.Println(fields)
+
+	// Create a temporary directory to store the files
+	directory, err := os.MkdirTemp("", "wp-zip-")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	filesDirectory := filepath.Join(directory, "files")
+	os.Mkdir(filesDirectory, 0755)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	log.Println("Copying files to temporary directory: " + filesDirectory)
+	err = client.DownloadDirectory(publicPath, filesDirectory)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	log.Println("Finished")
 }
 
 // This function isolates the sftp connection setup and ensures that a WordPress wp-config.php file

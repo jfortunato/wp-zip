@@ -23,6 +23,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&Port, "port", "P", "22", "SFTP port")
 	rootCmd.MarkFlagRequired("host")
 	rootCmd.MarkFlagRequired("username")
+	// TODO: Make this optional, and prompt for it if not provided
 	rootCmd.MarkFlagRequired("password")
 
 }
