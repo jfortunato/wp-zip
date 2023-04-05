@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sync"
 )
 
 // PackageWP is the main function that packages a WordPress site into a zip file
@@ -32,36 +33,29 @@ func PackageWP(credentials sftp.SSHCredentials, publicUrl, publicPath string) {
 	}
 	// Delete the temporary directory when we're done
 	defer os.RemoveAll(directory)
-	filesDirectory := filepath.Join(directory, "files")
-	os.Mkdir(filesDirectory, 0755)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	log.Println("Copying files to temporary directory: " + filesDirectory)
-	err = client.DownloadDirectory(publicPath, filesDirectory)
-	if err != nil {
-		log.Fatalln(err)
-	}
 
-	log.Println("Copying database to temporary directory: " + directory)
-	err = client.ExportDatabaseToFile(fields.dbUser, fields.dbPass, fields.dbName, filepath.Join(directory, "database.sql"))
-	if err != nil {
-		log.Fatalln(err)
-	}
+	// Run downloadFiles and downloadDatabase in go routines, and wait for them to finish
+	// before moving on to the next step
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		if err := downloadFiles(client, directory, publicPath); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		if err := downloadDatabase(client, directory, fields); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+	wg.Wait()
 
-	log.Println("Generating JSON file")
-	publicUrl = fmt.Sprintf("https://%s", publicUrl)
-	err = client.GenerateJsonFile(fields.dbUser, fields.dbPass, fields.dbName, publicUrl, publicPath, filepath.Join(directory, "wpmigrate-export.json"))
-	if err != nil {
+	if err := generateJsonFile(client, directory, fields, publicUrl, publicPath); err != nil {
 		log.Fatalln(err)
 	}
-
-	log.Println("Zipping files")
-	wd, err := os.Getwd()
-	if err != nil {
-		log.Fatalln(err)
-	}
-	if err = client.WriteZip(directory, filepath.Join(wd, "wp.zip")); err != nil {
+	if err := zipFiles(client, directory); err != nil {
 		log.Fatalln(err)
 	}
 
@@ -85,6 +79,68 @@ func setupClientAndReadWpConfig(credentials sftp.SSHCredentials, pathToWpConfig 
 	}
 
 	return client, contents, nil
+}
+
+func downloadFiles(client *sftp.ClientWrapper, directory, publicPath string) error {
+	filesDirectory := filepath.Join(directory, "files")
+
+	if err := os.Mkdir(filesDirectory, 0755); err != nil {
+		return fmt.Errorf("could not create files directory: %w", err)
+	}
+
+	log.Println("Copying files to temporary directory: " + filesDirectory)
+
+	if err := client.DownloadDirectory(publicPath, filesDirectory); err != nil {
+		return fmt.Errorf("could not download files: %w", err)
+	}
+
+	log.Println("Finished copying files")
+
+	return nil
+}
+
+func downloadDatabase(client *sftp.ClientWrapper, directory string, fields wpConfigFields) error {
+	log.Println("Copying database to temporary directory: " + directory)
+
+	if err := client.ExportDatabaseToFile(fields.dbUser, fields.dbPass, fields.dbName, filepath.Join(directory, "database.sql")); err != nil {
+		return fmt.Errorf("could not download database: %w", err)
+	}
+
+	log.Println("Finished copying database")
+
+	return nil
+}
+
+func generateJsonFile(client *sftp.ClientWrapper, directory string, fields wpConfigFields, publicUrl, publicPath string) error {
+	log.Println("Generating JSON file")
+
+	publicUrl = fmt.Sprintf("https://%s", publicUrl)
+
+	if err := client.GenerateJsonFile(fields.dbUser, fields.dbPass, fields.dbName, publicUrl, publicPath, filepath.Join(directory, "wpmigrate-export.json")); err != nil {
+		return fmt.Errorf("could not generate JSON file: %w", err)
+	}
+
+	log.Println("Finished generating JSON file")
+
+	return nil
+}
+
+func zipFiles(client *sftp.ClientWrapper, directory string) error {
+	log.Println("Zipping files")
+
+	wd, err := os.Getwd()
+
+	if err != nil {
+		return fmt.Errorf("could not get working directory: %w", err)
+	}
+
+	if err = client.WriteZip(directory, filepath.Join(wd, "wp.zip")); err != nil {
+		return fmt.Errorf("could not zip files: %w", err)
+	}
+
+	log.Println("Finished zipping files")
+
+	return nil
 }
 
 type wpConfigFields struct {
