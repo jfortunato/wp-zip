@@ -258,27 +258,25 @@ func (c *ClientWrapper) canRunRemoteCommand(cmd string) bool {
 func (c *ClientWrapper) downloadDirectoryWithTar(remoteDirectory string, localDirectory string) error {
 	// We'll pipe the remote tar output directly into the tar reader
 	reader, writer := io.Pipe()
-	defer reader.Close()
-	defer writer.Close()
-
-	sess, err := c.conn.NewSession()
-	if err != nil {
-		return err
-	}
-	sess.Stdout = writer
-	defer sess.Close()
 
 	go func() {
-		err := sess.Run("tar -C " + remoteDirectory + " -cf - .")
+		defer writer.Close()
+
+		sess, err := c.conn.NewSession()
 		if err != nil {
-			log.Println(err)
+			log.Fatalln("failed to create session: %w", err)
+		}
+		sess.Stdout = writer
+		defer sess.Close()
+
+		if err := sess.Run("tar -C " + remoteDirectory + " -cf - ."); err != nil {
+			log.Fatalln("failed to run tar: %w", err)
 		}
 	}()
 
 	tr := tar.NewReader(reader)
-	err = untarToDirectory(localDirectory, tr)
-	if err != nil {
-		return err
+	if err := untarToDirectory(localDirectory, tr); err != nil {
+		fmt.Errorf("failed to untar: %w", err)
 	}
 
 	return nil
