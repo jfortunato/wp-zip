@@ -2,6 +2,7 @@ package sftp
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"errors"
 	"fmt"
@@ -82,6 +83,58 @@ func (c *ClientWrapper) ReadFileToString(path string) (string, error) {
 	}
 
 	return b.String(), nil
+}
+
+func (c *ClientWrapper) WriteZip(directory, zipFilename string) error {
+	// Create the zip file
+	zipFile, err := os.Create(zipFilename)
+	if err != nil {
+		return fmt.Errorf("failed to create zip file: %s", err)
+	}
+	defer zipFile.Close()
+
+	// Create the zip writer
+	w := zip.NewWriter(zipFile)
+	defer w.Close()
+
+	// Walk the directory
+	return filepath.WalkDir(directory, func(path string, d os.DirEntry, err error) error {
+		// Convert the path to a relative path
+		relativePath, err := filepath.Rel(directory, path)
+
+		// Skip the first entry, which is the directory itself
+		if path == directory {
+			return nil
+		}
+
+		// The writer's Create method will create a directory if the path ends with a slash
+		if d.IsDir() {
+			relativePath += "/"
+		}
+
+		writer, err := w.Create(relativePath)
+		if err != nil {
+			return fmt.Errorf("failed to create zip entry: %w", err)
+		}
+
+		// We don't need to copy any contents if it's a directory
+		if d.IsDir() {
+			return nil
+		}
+
+		f, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("failed to open file: %w", err)
+		}
+		defer f.Close()
+
+		_, err = io.Copy(writer, f)
+		if err != nil {
+			return fmt.Errorf("failed to copy file to zip: %w", err)
+		}
+
+		return nil
+	})
 }
 
 func (c *ClientWrapper) GenerateJsonFile(dbUser, dbPass, dbName, publicUrl, publicPath, filename string) error {

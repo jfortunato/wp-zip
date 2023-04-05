@@ -30,6 +30,8 @@ func PackageWP(credentials sftp.SSHCredentials, publicUrl, publicPath string) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	// Delete the temporary directory when we're done
+	defer os.RemoveAll(directory)
 	filesDirectory := filepath.Join(directory, "files")
 	os.Mkdir(filesDirectory, 0755)
 	if err != nil {
@@ -56,6 +58,15 @@ func PackageWP(credentials sftp.SSHCredentials, publicUrl, publicPath string) {
 	publicUrl = fmt.Sprintf("https://%s", publicUrl)
 	err = client.GenerateJsonFile(fields.dbUser, fields.dbPass, fields.dbName, publicUrl, publicPath, filepath.Join(directory, "wpmigrate-export.json"))
 	if err != nil {
+		log.Fatalln(err)
+	}
+
+	log.Println("Zipping files")
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if err = client.WriteZip(directory, filepath.Join(wd, "wp.zip")); err != nil {
 		log.Fatalln(err)
 	}
 
