@@ -43,13 +43,8 @@ func PackageWP(credentials sftp.SSHCredentials, publicUrl, publicPath string) {
 		log.Fatalln(err)
 	}
 
-	databaseDirectory := filepath.Join(directory, "database")
-	os.Mkdir(databaseDirectory, 0755)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	log.Println("Copying database to temporary directory: " + databaseDirectory)
-	err = client.ExportDatabaseToFile(fields.dbUser, fields.dbPass, fields.dbName, filepath.Join(databaseDirectory, "database.sql"))
+	log.Println("Copying database to temporary directory: " + directory)
+	err = client.ExportDatabaseToFile(fields.dbUser, fields.dbPass, fields.dbName, filepath.Join(directory, "database.sql"))
 	if err != nil {
 		log.Fatalln(err)
 	}
