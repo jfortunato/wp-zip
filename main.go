@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	wp_zip.Execute()
+	wp_zip.Execute(wpZipVersion)
 }
