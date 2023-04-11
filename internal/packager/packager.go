@@ -14,7 +14,7 @@ import (
 func PackageWP(credentials sftp.SSHCredentials, publicUrl, publicPath string) {
 	// Assert that we can connect and the wp-config.php file exists under the publicPath
 	// by reading it into a local string
-	client, contents, err := setupClientAndReadWpConfig(credentials, filepath.Join(publicPath, "wp-config.php"))
+	client, contents, err := setupClientAndReadWpConfig(credentials, publicPath+"/wp-config.php") // Assume a unix-like path on the server
 	if err != nil {
 		log.Fatalln(err)
 	}
