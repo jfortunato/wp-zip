@@ -11,7 +11,7 @@ wp-zip:
 platform-all: platform-linux platform-windows platform-darwin
 
 platform-linux:
-	GOOS=linux GOARCH=amd64 go build $(GO_FLAGS) -o build/wp-zip-v$(WP_ZIP_VERSION)-linux-amd64.exe
+	GOOS=linux GOARCH=amd64 go build $(GO_FLAGS) -o build/wp-zip-v$(WP_ZIP_VERSION)-linux-amd64
 
 platform-windows:
 	GOOS=windows GOARCH=amd64 go build $(GO_FLAGS) -o build/wp-zip-v$(WP_ZIP_VERSION)-windows-amd64.exe
