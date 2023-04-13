@@ -3,7 +3,6 @@ package builder
 import (
 	"archive/zip"
 	"fmt"
-	"github.com/jfortunato/wp-zip/internal/operations"
 	"io"
 	"path/filepath"
 	"strings"
@@ -56,12 +55,6 @@ func PackageWP(c Client, outfile io.Writer, pathToPublic string, operations []Op
 
 	ch := make(chan File)
 
-	// Download all site files
-	//go c.Download(pathToPublic, ch)
-	//if err != nil {
-	//	return fmt.Errorf("error downloading files: %s", err)
-	//}
-
 	// Create a new zip writer
 	zw := zip.NewWriter(outfile)
 	defer zw.Close()
@@ -72,7 +65,7 @@ func PackageWP(c Client, outfile io.Writer, pathToPublic string, operations []Op
 
 	// Write the files into the zip
 	for file := range ch {
-		err := WriteIntoZip(zw, filepath.Join("files", file.Name), file.Body)
+		err := writeIntoZip(zw, filepath.Join("files", file.Name), file.Body)
 		if err != nil {
 			return fmt.Errorf("error writing file %s into zip: %s", file.Name, err)
 		}
@@ -92,28 +85,7 @@ func downloadSync(c Client, src string) (File, error) {
 	return <-ch, nil
 }
 
-func BuildZip(writer io.Writer, operationsToRun []operations.Operation) error {
-	// Ensure we have at least one operation to run
-	if len(operationsToRun) == 0 {
-		return &ErrNoOperations{}
-	}
-
-	// Create a new zip writer
-	zw := zip.NewWriter(writer)
-	defer zw.Close()
-
-	// Run each operation
-	for _, operation := range operationsToRun {
-		err := operation.WriteIntoZip(zw)
-		if err != nil {
-			return fmt.Errorf("error running operation: %s", err)
-		}
-	}
-
-	return nil
-}
-
-func WriteIntoZip(zw *zip.Writer, filename string, contents io.Reader) error {
+func writeIntoZip(zw *zip.Writer, filename string, contents io.Reader) error {
 	f, err := zw.Create(filename)
 	if err != nil {
 		return fmt.Errorf("error creating file %s in zip: %s", filename, err)
