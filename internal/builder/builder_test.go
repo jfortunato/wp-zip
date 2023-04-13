@@ -50,7 +50,7 @@ func TestPackageWP(t *testing.T) {
 
 		mockedClient := newMockedClient(filesOnServer)
 		operations := []Operation{&MockOperation{
-			SendFilesFunc: func(ch chan File) error {
+			SendFilesFunc: func() (<-chan File, error) {
 				panic("should not be called")
 			},
 		}}
@@ -66,9 +66,35 @@ func TestPackageWP(t *testing.T) {
 	})
 
 	t.Run("empty operations", func(t *testing.T) {
+		mockedClient := newMockedClient(nil)
+
+		b := &bytes.Buffer{}
+
+		err := PackageWP(mockedClient, b, "/var/www/html/", []Operation{})
+
+		_, ok := err.(*ErrNoOperations)
+		if !ok {
+			t.Errorf("got error %v; want ErrNoOperations", err)
+		}
 	})
 
 	t.Run("multiple operations", func(t *testing.T) {
+		filesOnServer := map[string]string{
+			"index.php":     "index.php contents",
+			"wp-config.php": "wp-config.php contents",
+		}
+
+		mockedClient := newMockedClient(filesOnServer)
+		operations := []Operation{
+			newMockedOperation(map[string]string{"index.php": "index.php contents"}),
+			newMockedOperation(map[string]string{"wp-config.php": "wp-config.php contents"}),
+		}
+
+		b := &bytes.Buffer{}
+
+		PackageWP(mockedClient, b, "/var/www/html/", operations)
+
+		expectZipContents(t, b, prefixFiles("files/", filesOnServer))
 	})
 }
 
@@ -92,11 +118,11 @@ func (c *MockClient) Run(cmd string) ([]byte, error) {
 }
 
 type MockOperation struct {
-	SendFilesFunc func(ch chan File) error
+	SendFilesFunc func() (<-chan File, error)
 }
 
-func (o *MockOperation) SendFiles(ch chan File) error {
-	return o.SendFilesFunc(ch)
+func (o *MockOperation) SendFiles() (<-chan File, error) {
+	return o.SendFilesFunc()
 }
 
 func newMockedClient(filesystem map[string]string) *MockClient {
@@ -138,16 +164,21 @@ func newMockedClient(filesystem map[string]string) *MockClient {
 
 func newMockedOperation(filesToSend map[string]string) *MockOperation {
 	mockedOperation := new(MockOperation)
-	mockedOperation.SendFilesFunc = func(ch chan File) error {
-		for filename, contents := range filesToSend {
-			ch <- File{
-				Name: filename,
-				Body: strings.NewReader(contents),
-			}
-		}
+	mockedOperation.SendFilesFunc = func() (<-chan File, error) {
+		ch := make(chan File)
 
-		close(ch)
-		return nil
+		go func() {
+			for filename, contents := range filesToSend {
+				ch <- File{
+					Name: filename,
+					Body: strings.NewReader(contents),
+				}
+			}
+
+			close(ch)
+		}()
+
+		return ch, nil
 	}
 
 	return mockedOperation

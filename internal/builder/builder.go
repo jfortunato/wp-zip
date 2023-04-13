@@ -6,6 +6,7 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 type ErrNoOperations struct{}
@@ -26,7 +27,7 @@ type Client interface {
 }
 
 type Operation interface {
-	SendFiles(ch chan File) error
+	SendFiles() (<-chan File, error)
 }
 
 func initOperations() []Operation {
@@ -41,6 +42,10 @@ func PackageWP(c Client, outfile io.Writer, pathToPublic string, operations []Op
 	// 2. A sql database dump, placed in the root of the archive
 	// 3. A JSON file containing some metadata about the site & it's environment, placed in the root of the archive
 
+	if len(operations) == 0 {
+		return &ErrNoOperations{}
+	}
+
 	// Ensure pathToPublic ends with a slash
 	if !strings.HasSuffix(pathToPublic, "/") {
 		pathToPublic = pathToPublic + "/"
@@ -53,18 +58,19 @@ func PackageWP(c Client, outfile io.Writer, pathToPublic string, operations []Op
 	}
 	_ = configFile
 
-	ch := make(chan File)
-
 	// Create a new zip writer
 	zw := zip.NewWriter(outfile)
 	defer zw.Close()
 
+	var ch []<-chan File
+
 	for _, operation := range operations {
-		go operation.SendFiles(ch)
+		channel, _ := operation.SendFiles()
+		ch = append(ch, channel)
 	}
 
 	// Write the files into the zip
-	for file := range ch {
+	for file := range merge(ch...) {
 		err := writeIntoZip(zw, filepath.Join("files", file.Name), file.Body)
 		if err != nil {
 			return fmt.Errorf("error writing file %s into zip: %s", file.Name, err)
@@ -95,4 +101,30 @@ func writeIntoZip(zw *zip.Writer, filename string, contents io.Reader) error {
 		return fmt.Errorf("error copying file %s into zip: %s", filename, err)
 	}
 	return nil
+}
+
+func merge(cs ...<-chan File) <-chan File {
+	var wg sync.WaitGroup
+	out := make(chan File)
+
+	// Start an output goroutine for each input channel in cs.  output
+	// copies values from c to out until c is closed, then calls wg.Done.
+	output := func(c <-chan File) {
+		for n := range c {
+			out <- n
+		}
+		wg.Done()
+	}
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+
+	// Start a goroutine to close out once all the output goroutines are
+	// done.  This must start after the wg.Add call.
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
 }

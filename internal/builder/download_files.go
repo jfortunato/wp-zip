@@ -7,6 +7,6 @@ func NewDownloadFilesOperation() Operation {
 	return &downloadFilesOperation{}
 }
 
-func (o *downloadFilesOperation) SendFiles(ch chan File) error {
-	return nil
+func (o *downloadFilesOperation) SendFiles() (<-chan File, error) {
+	return nil, nil
 }
