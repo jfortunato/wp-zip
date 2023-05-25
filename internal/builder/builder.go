@@ -31,8 +31,13 @@ type Operation interface {
 }
 
 func initOperations(c Client, pathToPublic string) []Operation {
+	downloadFilesOperation, err := NewDownloadFilesOperation(c, pathToPublic)
+	if err != nil {
+		panic(err)
+	}
+
 	return []Operation{
-		NewDownloadFilesOperation(c, pathToPublic),
+		downloadFilesOperation,
 	}
 }
 

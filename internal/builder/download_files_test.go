@@ -7,14 +7,16 @@ import (
 
 func TestDownloadFilesOperation_SendFiles(t *testing.T) {
 	t.Run("it should emit each file downloaded with the Client", func(t *testing.T) {
-		mockedClient := &MockClient{
-			DownloadFunc: func(path string, ch chan File) error {
-				ch <- File{Name: "index.php", Body: strings.NewReader("index.php contents")}
-				close(ch)
-				return nil
-			},
+		filesOnServer := map[string]string{
+			"index.php": "index.php contents",
 		}
-		op := NewDownloadFilesOperation(mockedClient, "/srv")
+
+		mockedClient := newMockedClient(filesOnServer)
+
+		op, err := NewDownloadFilesOperation(mockedClient, "/srv/")
+		if err != nil {
+			t.Errorf("got error %v; want nil", err)
+		}
 
 		ch, err := op.SendFiles()
 		if err != nil {
@@ -33,7 +35,11 @@ func TestDownloadFilesOperation_SendFiles(t *testing.T) {
 		})
 	})
 
-	t.Run("it should automatically add a forward slash to the public path", func(t *testing.T) {
+	t.Run("it should return an error if the public path does not end in a forward slash", func(t *testing.T) {
+		_, err := NewDownloadFilesOperation(newMockedClient(map[string]string{}), "/srv")
+		if err == nil {
+			t.Errorf("got nil error; want non-nil")
+		}
 	})
 }
 
