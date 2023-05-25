@@ -30,9 +30,9 @@ type Operation interface {
 	SendFiles() (<-chan File, error)
 }
 
-func initOperations() []Operation {
+func initOperations(c Client, pathToPublic string) []Operation {
 	return []Operation{
-		NewDownloadFilesOperation(),
+		NewDownloadFilesOperation(c, pathToPublic),
 	}
 }
 
