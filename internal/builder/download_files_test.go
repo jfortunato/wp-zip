@@ -34,13 +34,6 @@ func TestDownloadFilesOperation_SendFiles(t *testing.T) {
 			{Name: "index.php", Body: strings.NewReader("index.php contents")},
 		})
 	})
-
-	t.Run("it should return an error if the public path does not end in a forward slash", func(t *testing.T) {
-		_, err := NewDownloadFilesOperation(newMockedClient(map[string]string{}), "/srv")
-		if err == nil {
-			t.Errorf("got nil error; want non-nil")
-		}
-	})
 }
 
 func expectFiles(t *testing.T, files []File, expectedFiles []File) {

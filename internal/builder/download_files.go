@@ -1,21 +1,11 @@
 package builder
 
-import (
-	"errors"
-	"strings"
-)
-
 type downloadFilesOperation struct {
 	c            Client
-	pathToPublic string
+	pathToPublic PublicPath
 }
 
-func NewDownloadFilesOperation(c Client, pathToPublic string) (Operation, error) {
-	// Assert pathToPublic ends with a slash
-	if !strings.HasSuffix(pathToPublic, "/") {
-		return nil, errors.New("pathToPublic must end with a slash")
-	}
-
+func NewDownloadFilesOperation(c Client, pathToPublic PublicPath) (Operation, error) {
 	return &downloadFilesOperation{c, pathToPublic}, nil
 }
 
@@ -23,7 +13,7 @@ func (o *downloadFilesOperation) SendFiles() (<-chan File, error) {
 	ch := make(chan File)
 
 	go func() {
-		o.c.Download(o.pathToPublic, ch)
+		o.c.Download(string(o.pathToPublic), ch)
 	}()
 
 	return ch, nil

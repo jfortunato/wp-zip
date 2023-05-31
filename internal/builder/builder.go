@@ -30,7 +30,20 @@ type Operation interface {
 	SendFiles() (<-chan File, error)
 }
 
-func initOperations(c Client, pathToPublic string) []Operation {
+// PublicPath represents the path to the public directory of a WordPress site. We use this
+// type to consistently ensure that the path ends with a slash when used as a string.
+type PublicPath string
+
+func (p PublicPath) String() string {
+	// If p doesn't end in a slash, add one
+	if !strings.HasSuffix(string(p), "/") {
+		return string(p) + "/"
+	}
+
+	return string(p)
+}
+
+func initOperations(c Client, pathToPublic PublicPath) []Operation {
 	downloadFilesOperation, err := NewDownloadFilesOperation(c, pathToPublic)
 	if err != nil {
 		panic(err)
@@ -41,7 +54,7 @@ func initOperations(c Client, pathToPublic string) []Operation {
 	}
 }
 
-func PackageWP(c Client, outfile io.Writer, pathToPublic string, operations []Operation) error {
+func PackageWP(c Client, outfile io.Writer, pathToPublic PublicPath, operations []Operation) error {
 	// The resulting archive will consist of the following:
 	// 1. All site files, placed into a files/ directory
 	// 2. A sql database dump, placed in the root of the archive
@@ -51,13 +64,8 @@ func PackageWP(c Client, outfile io.Writer, pathToPublic string, operations []Op
 		return &ErrNoOperations{}
 	}
 
-	// Ensure pathToPublic ends with a slash
-	if !strings.HasSuffix(pathToPublic, "/") {
-		pathToPublic = pathToPublic + "/"
-	}
-
 	// Download/read the wp-config.php file
-	configFile, err := downloadSync(c, filepath.Join(pathToPublic, "wp-config.php"))
+	configFile, err := downloadSync(c, filepath.Join(string(pathToPublic), "wp-config.php"))
 	if err != nil {
 		return fmt.Errorf("error downloading wp-config.php: %s", err)
 	}

@@ -27,22 +27,6 @@ func TestPackageWP(t *testing.T) {
 		expectZipContents(t, b, prefixFiles("files/", filesOnServer))
 	})
 
-	t.Run("it adds a trailing slash to the public path if not given", func(t *testing.T) {
-		filesOnServer := map[string]string{
-			"index.php":     "index.php contents",
-			"wp-config.php": "wp-config.php contents",
-		}
-
-		mockedClient := newMockedClient(filesOnServer)
-		operations := []Operation{newMockedOperation(filesOnServer)}
-
-		b := &bytes.Buffer{}
-
-		PackageWP(mockedClient, b, "/var/www/html", operations)
-
-		expectZipContents(t, b, prefixFiles("files/", filesOnServer))
-	})
-
 	t.Run("it should not attempt any operations if it cannot read the wp-config file", func(t *testing.T) {
 		filesOnServer := map[string]string{
 			"index.php": "index.php contents",
@@ -95,6 +79,26 @@ func TestPackageWP(t *testing.T) {
 		PackageWP(mockedClient, b, "/var/www/html/", operations)
 
 		expectZipContents(t, b, prefixFiles("files/", filesOnServer))
+	})
+}
+
+func TestPublicPath_String(t *testing.T) {
+	t.Run("it should always end in forward slash when converting to string", func(t *testing.T) {
+		var tests = []struct {
+			input    string
+			expected string
+		}{
+			{"/srv/", "/srv/"},
+			{"/srv", "/srv/"},
+			{"/", "/"},
+		}
+
+		for _, test := range tests {
+			path := PublicPath(test.input)
+			if path.String() != test.expected {
+				t.Errorf("got %s; want %s", path.String(), test.expected)
+			}
+		}
 	})
 }
 
