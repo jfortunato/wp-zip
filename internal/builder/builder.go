@@ -6,7 +6,6 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
-	"sync"
 )
 
 type ErrNoOperations struct{}
@@ -26,8 +25,10 @@ type Client interface {
 	Run(cmd string) ([]byte, error)
 }
 
+type SendFilesFunc func(file File) error
+
 type Operation interface {
-	SendFiles() (<-chan File, error)
+	SendFiles(fn SendFilesFunc) error
 }
 
 // PublicPath represents the path to the public directory of a WordPress site. We use this
@@ -43,16 +44,16 @@ func (p PublicPath) String() string {
 	return string(p)
 }
 
-func initOperations(c Client, pathToPublic PublicPath) []Operation {
-	downloadFilesOperation, err := NewDownloadFilesOperation(c, pathToPublic)
-	if err != nil {
-		panic(err)
-	}
-
-	return []Operation{
-		downloadFilesOperation,
-	}
-}
+//func initOperations(c Client, pathToPublic PublicPath) []Operation {
+//	downloadFilesOperation, err := NewDownloadFilesOperation(c, pathToPublic)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	return []Operation{
+//		downloadFilesOperation,
+//	}
+//}
 
 func PackageWP(c Client, outfile io.Writer, pathToPublic PublicPath, operations []Operation) error {
 	// The resulting archive will consist of the following:
@@ -75,19 +76,15 @@ func PackageWP(c Client, outfile io.Writer, pathToPublic PublicPath, operations 
 	zw := zip.NewWriter(outfile)
 	defer zw.Close()
 
-	var ch []<-chan File
-
 	for _, operation := range operations {
-		channel, _ := operation.SendFiles()
-		ch = append(ch, channel)
-	}
-
-	// Write the files into the zip
-	for file := range merge(ch...) {
-		err := writeIntoZip(zw, filepath.Join("files", file.Name), file.Body)
-		if err != nil {
-			return fmt.Errorf("error writing file %s into zip: %s", file.Name, err)
-		}
+		operation.SendFiles(func(file File) error {
+			// Write the files into the zip
+			err := writeIntoZip(zw, filepath.Join("files", file.Name), file.Body)
+			if err != nil {
+				return fmt.Errorf("error writing file %s into zip: %s", file.Name, err)
+			}
+			return nil
+		})
 	}
 
 	return nil
@@ -114,30 +111,4 @@ func writeIntoZip(zw *zip.Writer, filename string, contents io.Reader) error {
 		return fmt.Errorf("error copying file %s into zip: %s", filename, err)
 	}
 	return nil
-}
-
-func merge(cs ...<-chan File) <-chan File {
-	var wg sync.WaitGroup
-	out := make(chan File)
-
-	// Start an output goroutine for each input channel in cs.  output
-	// copies values from c to out until c is closed, then calls wg.Done.
-	output := func(c <-chan File) {
-		for n := range c {
-			out <- n
-		}
-		wg.Done()
-	}
-	wg.Add(len(cs))
-	for _, c := range cs {
-		go output(c)
-	}
-
-	// Start a goroutine to close out once all the output goroutines are
-	// done.  This must start after the wg.Add call.
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-	return out
 }
