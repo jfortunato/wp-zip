@@ -69,6 +69,14 @@ func NewClient(credentials SSHCredentials) (*ClientWrapper, error) {
 	return &ClientWrapper{client, conn}, nil
 }
 
+func (c *ClientWrapper) ReadDir(path string) ([]os.FileInfo, error) {
+	return c.wrapper.ReadDir(path)
+}
+
+func (c *ClientWrapper) Open(path string) (*_sftp.File, error) {
+	return c.wrapper.Open(path)
+}
+
 func (c *ClientWrapper) ReadFileToString(path string) (string, error) {
 	file, err := c.wrapper.Open(path)
 	if err != nil {

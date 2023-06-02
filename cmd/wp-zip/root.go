@@ -2,11 +2,12 @@ package wp_zip
 
 import (
 	"errors"
-	"fmt"
-	"github.com/jfortunato/wp-zip/internal/packager"
+	"github.com/jfortunato/wp-zip/internal/builder"
 	"github.com/jfortunato/wp-zip/internal/sftp"
 	"github.com/spf13/cobra"
+	"log"
 	"os"
+	"path/filepath"
 )
 
 var Host string
@@ -39,7 +40,35 @@ var rootCmd = &cobra.Command{
 	to another host or to create a local development environment.`,
 	Args: argsValidation(),
 	Run: func(cmd *cobra.Command, args []string) {
-		packager.PackageWP(sftp.SSHCredentials{User: Username, Pass: Password, Host: Host, Port: Port}, Domain, args[0])
+		//packager.PackageWP(sftp.SSHCredentials{User: Username, Pass: Password, Host: Host, Port: Port}, Domain, args[0])
+
+		client, err := sftp.NewClient(sftp.SSHCredentials{User: Username, Pass: Password, Host: Host, Port: Port})
+		if err != nil {
+			log.Fatalln(err)
+		}
+		defer client.Close()
+
+		builder, err := builder.NewBuilder(client, builder.PublicPath(args[0]))
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		wd, err := os.Getwd()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		filename := filepath.Join(wd, "wp.zip")
+
+		zipFile, err := os.Create(filename)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		defer zipFile.Close()
+
+		err = builder.PackageWP(zipFile)
+		if err != nil {
+			log.Fatalln(err)
+		}
 	},
 }
 
@@ -58,7 +87,6 @@ func Execute(version string) {
 	rootCmd.Version = version
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatalln(err)
 	}
 }

@@ -3,9 +3,6 @@ package builder
 import (
 	"archive/zip"
 	"bytes"
-	"errors"
-	"io"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -17,12 +14,12 @@ func TestPackageWP(t *testing.T) {
 			"wp-config.php": "wp-config.php contents",
 		}
 
-		mockedClient := newMockedClient(filesOnServer)
+		mockedEmitter := &MockFileEmitter{filesOnServer}
 		operations := []Operation{&MockOperation{filesToSend: filesOnServer}}
 
 		b := &bytes.Buffer{}
-
-		PackageWP(mockedClient, b, "/var/www/html/", operations)
+		builder := &Builder{mockedEmitter, "/var/www/html/", operations}
+		builder.PackageWP(b)
 
 		expectZipContents(t, b, prefixFiles("files/", filesOnServer))
 	})
@@ -32,12 +29,12 @@ func TestPackageWP(t *testing.T) {
 			"index.php": "index.php contents",
 		}
 
-		mockedClient := newMockedClient(filesOnServer)
+		mockedEmitter := &MockFileEmitter{filesOnServer}
 		operation := &MockOperation{}
 
 		b := &bytes.Buffer{}
-
-		PackageWP(mockedClient, b, "/var/www/html/", []Operation{operation})
+		builder := &Builder{mockedEmitter, "/var/www/html/", []Operation{operation}}
+		builder.PackageWP(b)
 
 		// Assert that the operation was not called
 		if operation.sendFilesCalled != 0 {
@@ -51,11 +48,11 @@ func TestPackageWP(t *testing.T) {
 	})
 
 	t.Run("empty operations", func(t *testing.T) {
-		mockedClient := newMockedClient(nil)
+		mockedEmitter := &MockFileEmitter{}
 
 		b := &bytes.Buffer{}
-
-		err := PackageWP(mockedClient, b, "/var/www/html/", []Operation{})
+		builder := &Builder{mockedEmitter, "/var/www/html/", []Operation{}}
+		err := builder.PackageWP(b)
 
 		_, ok := err.(*ErrNoOperations)
 		if !ok {
@@ -69,15 +66,15 @@ func TestPackageWP(t *testing.T) {
 			"wp-config.php": "wp-config.php contents",
 		}
 
-		mockedClient := newMockedClient(filesOnServer)
+		mockedEmitter := &MockFileEmitter{filesOnServer}
 		operations := []Operation{
 			&MockOperation{filesToSend: map[string]string{"index.php": "index.php contents"}},
 			&MockOperation{filesToSend: map[string]string{"wp-config.php": "wp-config.php contents"}},
 		}
 
 		b := &bytes.Buffer{}
-
-		PackageWP(mockedClient, b, "/var/www/html/", operations)
+		builder := &Builder{mockedEmitter, "/var/www/html/", operations}
+		builder.PackageWP(b)
 
 		expectZipContents(t, b, prefixFiles("files/", filesOnServer))
 	})
@@ -103,25 +100,6 @@ func TestPublicPath_String(t *testing.T) {
 	})
 }
 
-type MockClient struct {
-	UploadFunc   func(src io.Reader, dst string) error
-	DownloadFunc func(src string, ch chan File) error
-	RunFunc      func(cmd string) ([]byte, error)
-	filesystem   map[string]string
-}
-
-func (c *MockClient) Upload(src io.Reader, dst string) error {
-	return c.UploadFunc(src, dst)
-}
-
-func (c *MockClient) Download(src string, ch chan File) error {
-	return c.DownloadFunc(src, ch)
-}
-
-func (c *MockClient) Run(cmd string) ([]byte, error) {
-	return c.RunFunc(cmd)
-}
-
 type MockOperation struct {
 	filesToSend     map[string]string
 	sendFilesCalled int
@@ -142,43 +120,6 @@ func (o *MockOperation) SendFiles(fn SendFilesFunc) error {
 	}
 
 	return nil
-}
-
-func newMockedClient(filesystem map[string]string) *MockClient {
-	mockedClient := new(MockClient)
-	mockedClient.filesystem = filesystem
-	mockedClient.DownloadFunc = func(src string, ch chan File) error {
-		// If the src ends in a slash, send all files; otherwise, send only the file
-		// that matches the src.
-		if strings.HasSuffix(src, "/") {
-			if len(mockedClient.filesystem) == 0 {
-				return errors.New("no files found")
-			}
-
-			for filename, contents := range mockedClient.filesystem {
-				ch <- File{
-					Name: filename,
-					Body: strings.NewReader(contents),
-				}
-			}
-		} else {
-			src = filepath.Base(src)
-
-			if _, ok := mockedClient.filesystem[src]; !ok {
-				return errors.New("file not found: " + src)
-			}
-
-			ch <- File{
-				Name: src,
-				Body: strings.NewReader(mockedClient.filesystem[src]),
-			}
-		}
-
-		close(ch)
-		return nil
-	}
-
-	return mockedClient
 }
 
 func prefixFiles(prefix string, files map[string]string) map[string]string {
