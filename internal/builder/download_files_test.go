@@ -2,6 +2,7 @@ package builder
 
 import (
 	"github.com/pkg/sftp"
+	"golang.org/x/crypto/ssh"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -64,6 +65,10 @@ func (c *ClientStub) ReadDir(path string) ([]os.FileInfo, error) {
 }
 
 func (c *ClientStub) Open(path string) (*sftp.File, error) {
+	return nil, nil
+}
+
+func (c *ClientStub) NewSession() (*ssh.Session, error) {
 	return nil, nil
 }
 

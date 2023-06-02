@@ -1,10 +1,14 @@
 package builder
 
 import (
+	"archive/tar"
 	"github.com/pkg/sftp"
+	"golang.org/x/crypto/ssh"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type DownloadFilesOperation struct {
@@ -43,12 +47,13 @@ type TarChecker interface {
 type Client interface {
 	ReadDir(path string) ([]os.FileInfo, error)
 	Open(path string) (*sftp.File, error)
+	NewSession() (*ssh.Session, error)
 }
 
 // NewFileEmitter is a factory function that returns a FileEmitter. It detects at runtime whether the remote server supports `tar` or not, and returns the appropriate downloader.
 func NewFileEmitter(checker TarChecker, client Client) FileEmitter {
 	if checker.HasTar() {
-		return &TarFileEmitter{}
+		return &TarFileEmitter{client}
 	}
 
 	return &SftpFileEmitter{client}
@@ -56,13 +61,74 @@ func NewFileEmitter(checker TarChecker, client Client) FileEmitter {
 
 // TarFileEmitter runs `tar` on the remote server as an easy way to "stream" the entire directory at once, instead of opening and closing an SFTP connection for each file. This results in a much faster download, and is thr preferred method of downloading files.
 type TarFileEmitter struct {
+	client Client
 }
 
 func (t *TarFileEmitter) EmitAll(src string, fn EmitFunc) error {
-	return nil
+	return t.emit(src, ".", fn)
 }
 
 func (t *TarFileEmitter) EmitSingle(src string, fn EmitFunc) error {
+	paths := strings.Split(src, "/")
+
+	parentDirectory := strings.Join(paths[:len(paths)-1], "/")
+	filepathRelativeToParent := paths[len(paths)-1]
+
+	return t.emit(parentDirectory, filepathRelativeToParent, fn)
+}
+
+func (t *TarFileEmitter) emit(parentDirectory, filepathRelativeToParent string, fn EmitFunc) error {
+	// We'll pipe the remote tar output directly into the tar reader
+	reader, writer := io.Pipe()
+
+	go func() {
+		defer writer.Close()
+
+		sess, err := t.client.NewSession()
+		if err != nil {
+			log.Fatalln("failed to create session: %w", err)
+		}
+		sess.Stdout = writer
+		defer sess.Close()
+
+		if err := sess.Run("tar -C " + parentDirectory + " -cf - " + filepathRelativeToParent); err != nil {
+			log.Fatalln("failed to run tar: %w", err)
+		}
+	}()
+
+	tr := tar.NewReader(reader)
+
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		// Remove any trailing slashes
+		header.Name = strings.TrimSuffix(header.Name, "/")
+		// Split the path into its components
+		paths := strings.Split(header.Name, "/")
+		// Ignore the first path (name should be something like "./foo, so disregard the ".)
+		paths = paths[1:]
+		// Don't do anything for the top level directory
+		if len(paths) == 0 {
+			continue
+		}
+
+		targetPath := filepath.Join(paths...)
+
+		// If the file is a directory, we don't need to do anything
+		if header.FileInfo().IsDir() {
+			continue
+		}
+
+		// Emit the file
+		fn(targetPath, tr)
+	}
+
 	return nil
 }
 

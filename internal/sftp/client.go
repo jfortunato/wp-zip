@@ -77,6 +77,10 @@ func (c *ClientWrapper) Open(path string) (*_sftp.File, error) {
 	return c.wrapper.Open(path)
 }
 
+func (c *ClientWrapper) NewSession() (*ssh.Session, error) {
+	return c.conn.NewSession()
+}
+
 func (c *ClientWrapper) ReadFileToString(path string) (string, error) {
 	file, err := c.wrapper.Open(path)
 	if err != nil {
@@ -213,7 +217,7 @@ echo json_encode(array_merge_recursive([
 }
 
 func (c *ClientWrapper) ExportDatabaseToFile(dbUser, dbPass, dbName string, filename string) error {
-	if !c.canRunRemoteCommand("mysqldump --version") {
+	if !c.CanRunRemoteCommand("mysqldump --version") {
 		return errors.New("mysqldump not found on remote server")
 	}
 
@@ -240,14 +244,14 @@ func (c *ClientWrapper) ExportDatabaseToFile(dbUser, dbPass, dbName string, file
 
 func (c *ClientWrapper) DownloadDirectory(remoteDirectory string, localDirectory string) error {
 	// First see if we can use the tar client, then fall back to the sftp client
-	if c.canRunRemoteCommand("tar --version") {
+	if c.CanRunRemoteCommand("tar --version") {
 		return c.downloadDirectoryWithTar(remoteDirectory, localDirectory)
 	} else {
 		return c.downloadDirectoryWithSftp(remoteDirectory, localDirectory)
 	}
 }
 
-func (c *ClientWrapper) canRunRemoteCommand(cmd string) bool {
+func (c *ClientWrapper) CanRunRemoteCommand(cmd string) bool {
 	sess, err := c.conn.NewSession()
 	if err != nil {
 		return false
