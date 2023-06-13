@@ -40,11 +40,6 @@ func (o *DownloadFilesOperation) SendFiles(fn SendFilesFunc) error {
 	})
 }
 
-// TarChecker is an interface that can be implemented by an sftp client to determine if the remote server supports `tar` or not.
-type TarChecker interface {
-	HasTar() bool
-}
-
 type Client interface {
 	ReadDir(path string) ([]os.FileInfo, error)
 	Open(path string) (*sftp.File, error)
@@ -52,8 +47,8 @@ type Client interface {
 }
 
 // NewFileEmitter is a factory function that returns a FileEmitter. It detects at runtime whether the remote server supports `tar` or not, and returns the appropriate downloader.
-func NewFileEmitter(checker TarChecker, client Client) FileEmitter {
-	if checker.HasTar() {
+func NewFileEmitter(checker RemoteCommandRunner, client Client) FileEmitter {
+	if checker.CanRunRemoteCommand("tar --version") {
 		return &TarFileEmitter{client}
 	}
 

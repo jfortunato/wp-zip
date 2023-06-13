@@ -40,7 +40,12 @@ func TestDownloadFiles_FileEmitter_Factory(t *testing.T) {
 		}
 
 		for _, test := range tests {
-			downloader := NewFileEmitter(&MockTarChecker{isTarSupported: test.isTarSupported}, &ClientStub{})
+			supportedCommands := map[string]string{}
+			if test.isTarSupported {
+				supportedCommands["tar --version"] = "tar version 1.0.0"
+			}
+
+			downloader := NewFileEmitter(&MockCommandRunner{supportedCommands}, &ClientStub{})
 
 			if reflect.TypeOf(downloader).String() != test.expectedType {
 				t.Errorf("got type %s; want %s", reflect.TypeOf(downloader).String(), test.expectedType)

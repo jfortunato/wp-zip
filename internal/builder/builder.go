@@ -39,16 +39,8 @@ func (p PublicPath) String() string {
 	return string(p)
 }
 
-type ClientTarChecker struct {
-	c *sftp.ClientWrapper
-}
-
-func (f *ClientTarChecker) HasTar() bool {
-	return f.c.CanRunRemoteCommand("tar --version")
-}
-
 func initFileEmitter(c *sftp.ClientWrapper) FileEmitter {
-	return NewFileEmitter(&ClientTarChecker{c}, c)
+	return NewFileEmitter(c, c)
 }
 
 type Builder struct {
