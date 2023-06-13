@@ -23,16 +23,8 @@ func TestDownloadFilesOperation_SendFiles(t *testing.T) {
 			t.Errorf("got error %v; want nil", err)
 		}
 
-		var filesSent []File
-
-		operation.SendFiles(func(file File) error {
-			filesSent = append(filesSent, file)
-			return nil
-		})
-
-		// Assert the channel emitted the expected files
-		expectFiles(t, filesSent, []File{
-			{Name: "index.php", Body: strings.NewReader("index.php contents")},
+		expectFilesSentFromOperation(t, operation, map[string]string{
+			"files/index.php": "index.php contents",
 		})
 	})
 }
@@ -111,6 +103,23 @@ func (m *MockFileEmitter) EmitSingle(src string, fn EmitFunc) error {
 	return nil
 }
 
+func expectFilesSentFromOperation(t *testing.T, operation Operation, expectedFiles map[string]string) {
+	var filesSent []File
+
+	operation.SendFiles(func(file File) error {
+		filesSent = append(filesSent, file)
+		return nil
+	})
+
+	// Convert the expected files to a File slice
+	var expectedFilesSlice []File
+	for name, body := range expectedFiles {
+		expectedFilesSlice = append(expectedFilesSlice, File{Name: name, Body: strings.NewReader(body)})
+	}
+
+	expectFiles(t, filesSent, expectedFilesSlice)
+}
+
 func expectFiles(t *testing.T, files []File, expectedFiles []File) {
 	if len(files) != len(expectedFiles) {
 		t.Errorf("got %d files; want %d", len(files), len(expectedFiles))
@@ -121,10 +130,9 @@ func expectFiles(t *testing.T, files []File, expectedFiles []File) {
 			t.Errorf("got file %d name %s; want %s", i, file.Name, expectedFiles[i].Name)
 		}
 
-		var expectedBody string
-		var actualBody string
-		expectedFiles[i].Body.Read([]byte(expectedBody))
-		file.Body.Read([]byte(actualBody))
+		expectedBody := readerToString(expectedFiles[i].Body)
+		actualBody := readerToString(file.Body)
+
 		if actualBody != expectedBody {
 			t.Errorf("got file %d body %s; want %s", i, actualBody, expectedBody)
 		}

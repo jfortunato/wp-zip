@@ -18,6 +18,7 @@ type DownloadFilesOperation struct {
 
 type EmitFunc func(path string, contents io.Reader)
 
+// A FileEmitter is basically a file downloader, but it doesn't actually download files to the filesystem. Instead, it just emits the file data (name, contents) and it's up to the caller to do something with it.
 type FileEmitter interface {
 	EmitAll(src string, fn EmitFunc) error
 	EmitSingle(src string, fn EmitFunc) error
@@ -31,7 +32,7 @@ func (o *DownloadFilesOperation) SendFiles(fn SendFilesFunc) error {
 	// Download the entire public directory and emit each file as they come in to the channel
 	return o.emitter.EmitAll(string(o.pathToPublic), func(path string, contents io.Reader) {
 		f := File{
-			Name: path,
+			Name: filepath.Join("files", path), // We want to store the files in the "files" directory
 			Body: contents,
 		}
 
@@ -59,7 +60,7 @@ func NewFileEmitter(checker TarChecker, client Client) FileEmitter {
 	return &SftpFileEmitter{client}
 }
 
-// TarFileEmitter runs `tar` on the remote server as an easy way to "stream" the entire directory at once, instead of opening and closing an SFTP connection for each file. This results in a much faster download, and is thr preferred method of downloading files.
+// TarFileEmitter runs `tar` on the remote server as an easy way to "stream" the entire directory at once, instead of opening and closing an SFTP connection for each file. This results in a much faster download, and is the preferred method of downloading files.
 type TarFileEmitter struct {
 	client Client
 }
@@ -111,11 +112,14 @@ func (t *TarFileEmitter) emit(parentDirectory, filepathRelativeToParent string, 
 		header.Name = strings.TrimSuffix(header.Name, "/")
 		// Split the path into its components
 		paths := strings.Split(header.Name, "/")
-		// Ignore the first path (name should be something like "./foo, so disregard the ".)
-		paths = paths[1:]
-		// Don't do anything for the top level directory
-		if len(paths) == 0 {
-			continue
+
+		if filepathRelativeToParent == "." {
+			// Ignore the first path (name should be something like "./foo, so disregard the ".)
+			paths = paths[1:]
+			// Don't do anything for the top level directory
+			if len(paths) == 0 {
+				continue
+			}
 		}
 
 		targetPath := filepath.Join(paths...)

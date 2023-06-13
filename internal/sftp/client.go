@@ -267,6 +267,28 @@ func (c *ClientWrapper) CanRunRemoteCommand(cmd string) bool {
 	return true
 }
 
+func (c *ClientWrapper) RunRemoteCommand(command string) (io.Reader, error) {
+	// We'll pipe the remote output directly into the reader
+	reader, writer := io.Pipe()
+
+	go func() {
+		defer writer.Close()
+
+		sess, err := c.conn.NewSession()
+		if err != nil {
+			log.Fatalln("failed to create session: %w", err)
+		}
+		sess.Stdout = writer
+		defer sess.Close()
+
+		if err := sess.Run(command); err != nil {
+			log.Fatalln("failed to run command: %w", err)
+		}
+	}()
+
+	return reader, nil
+}
+
 func (c *ClientWrapper) downloadDirectoryWithTar(remoteDirectory string, localDirectory string) error {
 	// We'll pipe the remote tar output directly into the tar reader
 	reader, writer := io.Pipe()

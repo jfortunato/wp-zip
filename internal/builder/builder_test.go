@@ -3,6 +3,7 @@ package builder
 import (
 	"archive/zip"
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -14,44 +15,56 @@ func TestPackageWP(t *testing.T) {
 			"wp-config.php": "wp-config.php contents",
 		}
 
-		mockedEmitter := &MockFileEmitter{filesOnServer}
 		operations := []Operation{&MockOperation{filesToSend: filesOnServer}}
 
 		b := &bytes.Buffer{}
-		builder := &Builder{mockedEmitter, "/var/www/html/", operations}
+		builder := &Builder{"/var/www/html/", operations}
 		builder.PackageWP(b)
 
-		expectZipContents(t, b, prefixFiles("files/", filesOnServer))
+		expectZipContents(t, b, filesOnServer)
 	})
 
-	t.Run("it should not attempt any operations if it cannot read the wp-config file", func(t *testing.T) {
-		filesOnServer := map[string]string{
-			"index.php": "index.php contents",
-		}
+	//t.Run("it should not attempt any operations if it cannot read the wp-config file", func(t *testing.T) {
+	//	filesOnServer := map[string]string{
+	//		"index.php": "index.php contents",
+	//	}
+	//
+	//	mockedEmitter := &MockFileEmitter{filesOnServer}
+	//	operation := &MockOperation{}
+	//
+	//	b := &bytes.Buffer{}
+	//	builder := &Builder{mockedEmitter, "/var/www/html/", []Operation{operation}}
+	//	builder.PackageWP(b)
+	//
+	//	// Assert that the operation was not called
+	//	if operation.sendFilesCalled != 0 {
+	//		t.Errorf("operation.SendFiles() was called %d times; want 0", operation.sendFilesCalled)
+	//	}
+	//
+	//	// Assert the buffer is empty
+	//	if b.Len() != 0 {
+	//		t.Errorf("buffer is not empty; want empty buffer")
+	//	}
+	//})
 
-		mockedEmitter := &MockFileEmitter{filesOnServer}
-		operation := &MockOperation{}
+	t.Run("it should return any error during an operations send files", func(t *testing.T) {
+		// Use an ErrorOperation to force an error
+		operations := []Operation{&ErrorOperation{}}
 
 		b := &bytes.Buffer{}
-		builder := &Builder{mockedEmitter, "/var/www/html/", []Operation{operation}}
-		builder.PackageWP(b)
+		builder := &Builder{"/var/www/html/", operations}
+		err := builder.PackageWP(b)
 
-		// Assert that the operation was not called
-		if operation.sendFilesCalled != 0 {
-			t.Errorf("operation.SendFiles() was called %d times; want 0", operation.sendFilesCalled)
+		if err == nil || !strings.Contains(err.Error(), "error from ErrorOperation") {
+			t.Errorf("got error %v; want error from ErrorOperation", err)
 		}
 
-		// Assert the buffer is empty
-		if b.Len() != 0 {
-			t.Errorf("buffer is not empty; want empty buffer")
-		}
+		expectZipContents(t, b, map[string]string{})
 	})
 
 	t.Run("empty operations", func(t *testing.T) {
-		mockedEmitter := &MockFileEmitter{}
-
 		b := &bytes.Buffer{}
-		builder := &Builder{mockedEmitter, "/var/www/html/", []Operation{}}
+		builder := &Builder{"/var/www/html/", []Operation{}}
 		err := builder.PackageWP(b)
 
 		_, ok := err.(*ErrNoOperations)
@@ -66,17 +79,16 @@ func TestPackageWP(t *testing.T) {
 			"wp-config.php": "wp-config.php contents",
 		}
 
-		mockedEmitter := &MockFileEmitter{filesOnServer}
 		operations := []Operation{
 			&MockOperation{filesToSend: map[string]string{"index.php": "index.php contents"}},
 			&MockOperation{filesToSend: map[string]string{"wp-config.php": "wp-config.php contents"}},
 		}
 
 		b := &bytes.Buffer{}
-		builder := &Builder{mockedEmitter, "/var/www/html/", operations}
+		builder := &Builder{"/var/www/html/", operations}
 		builder.PackageWP(b)
 
-		expectZipContents(t, b, prefixFiles("files/", filesOnServer))
+		expectZipContents(t, b, filesOnServer)
 	})
 }
 
@@ -122,14 +134,11 @@ func (o *MockOperation) SendFiles(fn SendFilesFunc) error {
 	return nil
 }
 
-func prefixFiles(prefix string, files map[string]string) map[string]string {
-	prefixedFiles := make(map[string]string)
+type ErrorOperation struct {
+}
 
-	for filename, contents := range files {
-		prefixedFiles[prefix+filename] = contents
-	}
-
-	return prefixedFiles
+func (o *ErrorOperation) SendFiles(fn SendFilesFunc) error {
+	return errors.New("error from ErrorOperation")
 }
 
 func expectZipContents(t *testing.T, b *bytes.Buffer, expectedFiles map[string]string) {

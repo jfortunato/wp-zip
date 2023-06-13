@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/jfortunato/wp-zip/internal/sftp"
 	"io"
-	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -51,29 +51,9 @@ func initFileEmitter(c *sftp.ClientWrapper) FileEmitter {
 	return NewFileEmitter(&ClientTarChecker{c}, c)
 }
 
-func initOperations(c *sftp.ClientWrapper, pathToPublic PublicPath) []Operation {
-	downloadFilesOperation, err := NewDownloadFilesOperation(initFileEmitter(c), pathToPublic)
-	if err != nil {
-		panic(err)
-	}
-
-	return []Operation{
-		downloadFilesOperation,
-	}
-}
-
 type Builder struct {
-	e          FileEmitter
 	publicPath PublicPath
 	operations []Operation
-}
-
-func NewBuilder(client *sftp.ClientWrapper, publicPath PublicPath) (*Builder, error) {
-	return &Builder{
-		initFileEmitter(client),
-		publicPath,
-		initOperations(client, publicPath),
-	}, nil
 }
 
 func (b *Builder) PackageWP(outfile io.Writer) error {
@@ -86,45 +66,68 @@ func (b *Builder) PackageWP(outfile io.Writer) error {
 		return &ErrNoOperations{}
 	}
 
-	// Download/read the wp-config.php file
-	var configFile File
-	err := b.e.EmitSingle(filepath.Join(string(b.publicPath), "wp-config.php"), func(path string, contents io.Reader) {
-		configFile = File{
-			Name: path,
-			Body: contents,
-		}
-	})
-	if err != nil {
-		return fmt.Errorf("error reading wp-config.php: %s", err)
-	}
-	_ = configFile
-
 	// Create a new zip writer
 	zw := zip.NewWriter(outfile)
 	defer zw.Close()
 
 	for _, operation := range b.operations {
-		operation.SendFiles(func(file File) error {
+		err := operation.SendFiles(func(file File) error {
 			// Write the files into the zip
-			err := writeIntoZip(zw, filepath.Join("files", file.Name), file.Body)
+			err := writeIntoZip(zw, file)
 			if err != nil {
 				return fmt.Errorf("error writing file %s into zip: %s", file.Name, err)
 			}
 			return nil
 		})
+
+		if err != nil {
+			return fmt.Errorf("error sending files: %s", err)
+		}
 	}
 
 	return nil
 }
 
-func writeIntoZip(zw *zip.Writer, filename string, contents io.Reader) error {
-	f, err := zw.Create(filename)
+func writeIntoZip(zw *zip.Writer, file File) error {
+	f, err := zw.Create(file.Name)
 	if err != nil {
-		return fmt.Errorf("error creating file %s in zip: %s", filename, err)
+		return fmt.Errorf("error creating file %s in zip: %s", file.Name, err)
 	}
-	_, err = io.Copy(f, contents)
+	_, err = io.Copy(f, file.Body)
 	if err != nil {
-		return fmt.Errorf("error copying file %s into zip: %s", filename, err)
+		return fmt.Errorf("error copying file %s into zip: %s", file.Name, err)
 	}
 	return nil
+}
+
+func readerToString(r io.Reader) string {
+	buf := new(strings.Builder)
+	_, err := io.Copy(buf, r)
+	if err != nil {
+		panic(err)
+	}
+	return buf.String()
+}
+
+func parseDatabaseCredentials(contents string) (DatabaseCredentials, error) {
+	var fields = map[string]string{"DB_USER": "", "DB_PASSWORD": "", "DB_NAME": ""}
+
+	for field, _ := range fields {
+		value, err := parseWpConfigField(contents, field)
+		if err != nil {
+			return DatabaseCredentials{}, err
+		}
+		fields[field] = value
+	}
+
+	return DatabaseCredentials{User: fields["DB_USER"], Pass: fields["DB_PASSWORD"], Name: fields["DB_NAME"]}, nil
+}
+
+func parseWpConfigField(contents, field string) (string, error) {
+	re := regexp.MustCompile(`define\(['"]` + field + `['"], ['"](.*)['"]\);`)
+	matches := re.FindStringSubmatch(contents)
+	if len(matches) != 2 {
+		return "", fmt.Errorf("could not parse %s from wp-config.php", field)
+	}
+	return matches[1], nil
 }
