@@ -102,7 +102,9 @@ func TestMain(m *testing.M) {
 }
 
 func TestZipFileCreated(t *testing.T) {
-	builder.PackageWP(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: getServicePort("SSH")}, "http://localhost:"+getServicePort("HTTP"), DOCUMENT_ROOT)
+	domain := builder.Domain("localhost:" + getServicePort("HTTP"))
+
+	builder.PackageWP(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: getServicePort("SSH")}, domain, DOCUMENT_ROOT)
 
 	filename := outputFile()
 	defer cleanup(t, filename)
@@ -111,12 +113,14 @@ func TestZipFileCreated(t *testing.T) {
 }
 
 func TestUploadedFileIsAlwaysDeleted(t *testing.T) {
-	invalidUrl := "localhost:" + getServicePort("HTTP")
+	// When an invalid url is passed to the builder, it runs successfully up until it needs to generate the json file
+	// and send an http request.
+	invalidDomain := builder.Domain("localhost:8888")
 
 	credentials := sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: getServicePort("SSH")}
 
 	// We expect an error here because the url is invalid
-	err := builder.PackageWP(credentials, invalidUrl, DOCUMENT_ROOT)
+	err := builder.PackageWP(credentials, invalidDomain, DOCUMENT_ROOT)
 	if err == nil {
 		t.Errorf("Expected error, got nil")
 	}

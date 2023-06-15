@@ -28,7 +28,14 @@ func TestGenerateJsonOperation(t *testing.T) {
 
 	t.Run("it returns an error if the http request returns an error", func(t *testing.T) {
 		operation := newOperation()
-		operation.g = &MockHttpGetter{errorStub: errors.New("error response")}
+		operation.g = &MockHttpGetter{
+			responseStubs: map[string]GetterResponse{
+				"https://localhost/wp-zip.php": {
+					resp: nil,
+					err:  errors.New("error response"),
+				},
+			},
+		}
 
 		err := operation.SendFiles(func(file File) error {
 			return nil
@@ -37,10 +44,37 @@ func TestGenerateJsonOperation(t *testing.T) {
 		assertError(t, err, ErrInvalidResponse)
 	})
 
+	t.Run("it attempts an insecure url (http) after an unsuccessful secure url (https)", func(t *testing.T) {
+		operation := newOperation()
+		operation.g = &MockHttpGetter{
+			responseStubs: map[string]GetterResponse{
+				"https://localhost/wp-zip.php": {
+					resp: nil,
+					err:  errors.New("error response"),
+				},
+				"http://localhost/wp-zip.php": {
+					resp: io.NopCloser(strings.NewReader(`{"name":"Migrated Site"}`)),
+					err:  nil,
+				},
+			},
+		}
+
+		expectFilesSentFromOperation(t, operation, map[string]string{
+			"wpmigrate-export.json": `{"name":"Migrated Site"}`,
+		})
+	})
+
 	t.Run("it returns an error if the http response is not what we expect", func(t *testing.T) {
 		operation := newOperation()
 		// No error, but the response is not what we expect
-		operation.g = &MockHttpGetter{responseStub: io.NopCloser(strings.NewReader("invalid response")), errorStub: nil}
+		operation.g = &MockHttpGetter{
+			responseStubs: map[string]GetterResponse{
+				"https://localhost/wp-zip.php": {
+					resp: io.NopCloser(strings.NewReader("invalid response")),
+					err:  nil,
+				},
+			},
+		}
 
 		err := operation.SendFiles(func(file File) error {
 			return nil
@@ -65,10 +99,20 @@ func TestGenerateJsonOperation(t *testing.T) {
 // the default behaviour by setting the fields on the operation.
 func newOperation() *GenerateJsonOperation {
 	return &GenerateJsonOperation{
-		u:          &MockFileUploadDeleter{},
-		g:          &MockHttpGetter{responseStub: io.NopCloser(strings.NewReader(`{"name":"Migrated Site"}`)), errorStub: nil},
-		publicUrl:  "http://localhost",
+		u: &MockFileUploadDeleter{},
+		g: &MockHttpGetter{
+			responseStubs: map[string]GetterResponse{
+				"https://localhost/wp-zip.php": {
+					resp: io.NopCloser(strings.NewReader(`{"name":"Migrated Site"}`)),
+					err:  nil,
+				},
+			},
+		},
+		publicUrl:  "localhost",
 		publicPath: "public",
+		randomFileNamer: func() string {
+			return "wp-zip.php"
+		},
 	}
 }
 
@@ -85,13 +129,21 @@ func (m *MockFileUploadDeleter) Delete(dst string) error {
 	return m.deleteErrorStub
 }
 
+type GetterResponse struct {
+	resp io.ReadCloser
+	err  error
+}
+
 type MockHttpGetter struct {
-	responseStub io.ReadCloser
-	errorStub    error
+	responseStubs map[string]GetterResponse
 }
 
 func (m *MockHttpGetter) Get(url string) (resp io.ReadCloser, err error) {
-	return m.responseStub, m.errorStub
+	response, ok := m.responseStubs[url]
+	if !ok {
+		return nil, errors.New("no response stub for url: " + url)
+	}
+	return response.resp, response.err
 }
 
 func assertError(t testing.TB, got, want error) {

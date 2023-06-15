@@ -13,11 +13,12 @@ import (
 )
 
 type GenerateJsonOperation struct {
-	u           FileUploadDeleter
-	g           HttpGetter
-	publicUrl   string
-	publicPath  PublicPath
-	credentials DatabaseCredentials
+	u               FileUploadDeleter
+	g               HttpGetter
+	publicUrl       Domain
+	publicPath      PublicPath
+	credentials     DatabaseCredentials
+	randomFileNamer func() string
 }
 
 var (
@@ -45,7 +46,7 @@ func (o *GenerateJsonOperation) SendFiles(fn SendFilesFunc) (err error) {
 
 	// 1.
 	// Generate a random filename
-	uploadFilename := filepath.Join(string(o.publicPath), "wp-zip-"+randSeq(10)+".php")
+	uploadFilename := filepath.Join(string(o.publicPath), o.randomFileNamer())
 	err = o.u.Upload(strings.NewReader(getPhpFileContents(o.credentials, o.publicUrl, o.publicPath)), uploadFilename)
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrCouldNotUploadFile, err)
@@ -61,9 +62,13 @@ func (o *GenerateJsonOperation) SendFiles(fn SendFilesFunc) (err error) {
 
 	// 2.
 	basename := filepath.Base(uploadFilename)
-	resp, err := o.g.Get(o.publicUrl + "/" + basename)
+	resp, err := o.g.Get(o.publicUrl.AsSecureUrl() + "/" + basename)
 	if err != nil {
-		return fmt.Errorf("%w: %s", ErrInvalidResponse, err)
+		// Try an insecure URL before returning an error
+		resp, err = o.g.Get(o.publicUrl.AsInsecureUrl() + "/" + basename)
+		if err != nil {
+			return fmt.Errorf("%w: %s", ErrInvalidResponse, err)
+		}
 	}
 	defer resp.Close()
 	// Read the response body to a string
@@ -108,7 +113,7 @@ func randSeq(n int) string {
 	return string(b)
 }
 
-func getPhpFileContents(credentials DatabaseCredentials, publicUrl string, publicPath PublicPath) string {
+func getPhpFileContents(credentials DatabaseCredentials, publicUrl Domain, publicPath PublicPath) string {
 	return fmt.Sprintf(`<?php
 
 // Connect to mysql and get the mysql version

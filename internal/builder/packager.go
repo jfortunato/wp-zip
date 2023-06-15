@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-func PackageWP(sshCredentials sftp.SSHCredentials, publicUrl, publicPath string) error {
+func PackageWP(sshCredentials sftp.SSHCredentials, publicUrl Domain, publicPath string) error {
 	client, err := sftp.NewClient(sshCredentials)
 	if err != nil {
 		return fmt.Errorf("error creating new client: %w", err)
@@ -42,7 +42,7 @@ func PackageWP(sshCredentials sftp.SSHCredentials, publicUrl, publicPath string)
 	return nil
 }
 
-func prepareOperations(c *sftp.ClientWrapper, publicUrl string, pathToPublic PublicPath) ([]Operation, error) {
+func prepareOperations(c *sftp.ClientWrapper, publicUrl Domain, pathToPublic PublicPath) ([]Operation, error) {
 	fileEmitter := initFileEmitter(c)
 
 	downloadFilesOperation, err := NewDownloadFilesOperation(fileEmitter, pathToPublic)
@@ -77,6 +77,9 @@ func prepareOperations(c *sftp.ClientWrapper, publicUrl string, pathToPublic Pub
 		publicUrl:   publicUrl,
 		publicPath:  pathToPublic,
 		credentials: credentials,
+		randomFileNamer: func() string {
+			return "wp-zip-" + randSeq(10) + ".php"
+		},
 	}
 
 	operations := []Operation{
