@@ -19,14 +19,6 @@ import (
 	"testing"
 )
 
-// Docker will assign random ports to the container, and ory/dockertest allows us to retrieve the ports
-// at runtime using something like resource.GetPort("internal_port/tcp")
-var (
-	SSH_PORT   string
-	HTTP_PORT  string
-	MYSQL_PORT string
-)
-
 // Assign some constants for the container
 const (
 	PATH_TO_DOCKERFILE  = "./docker/openssh-test-server/Dockerfile"
@@ -38,6 +30,17 @@ const (
 	MYSQL_DATABASE      = "some_db_name"
 	DOCUMENT_ROOT       = "/var/www/html"
 )
+
+type containerService struct {
+	name string
+	// Docker will assign random ports to the container, and ory/dockertest allows us to retrieve the ports
+	// at runtime using something like resource.GetPort("internal_port/tcp")
+	portId string
+	port   string
+	ready  func() error
+}
+
+var services []containerService
 
 func TestMain(m *testing.M) {
 	// uses a sensible default on windows (tcp/http) and linux/osx (socket)
@@ -72,33 +75,18 @@ func TestMain(m *testing.M) {
 
 	resource.Expire(60) // Tell docker to hard kill the container in 60 seconds
 
+	services = createContainerServices(resource)
+
 	// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
 	if err := pool.Retry(func() error {
-		SSH_PORT = resource.GetPort("22/tcp")
-		HTTP_PORT = resource.GetPort("80/tcp")
-		MYSQL_PORT = resource.GetPort("3306/tcp")
-
-		var err error
-
 		// We want to ensure that all the services we need are up and running.
-		// First, we check the ssh server.
-		_, err = net.Dial("tcp", net.JoinHostPort("localhost", SSH_PORT))
-		if err != nil {
-			return err
+		for _, service := range services {
+			if err := service.ready(); err != nil {
+				return err
+			}
 		}
 
-		// Then, we check the http server.
-		resp, err := http.Get("http://localhost:" + HTTP_PORT)
-		if err != nil || resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("could not connect to http server: %s", err)
-		}
-
-		// Finally, we check the database.
-		db, err := sql.Open("mysql", fmt.Sprintf("root:rootpass@(localhost:%s)/mysql", MYSQL_PORT))
-		if err != nil {
-			return err
-		}
-		return db.Ping()
+		return nil
 	}); err != nil {
 		log.Fatalf("Could not connect to one of the container services: %s", err)
 	}
@@ -114,7 +102,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestZipFileCreated(t *testing.T) {
-	builder.PackageWP(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: SSH_PORT}, "http://localhost:"+HTTP_PORT, DOCUMENT_ROOT)
+	builder.PackageWP(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: getServicePort("SSH")}, "http://localhost:"+getServicePort("HTTP"), DOCUMENT_ROOT)
 
 	filename := outputFile()
 	defer cleanup(t, filename)
@@ -123,9 +111,9 @@ func TestZipFileCreated(t *testing.T) {
 }
 
 func TestUploadedFileIsAlwaysDeleted(t *testing.T) {
-	invalidUrl := "localhost:" + HTTP_PORT
+	invalidUrl := "localhost:" + getServicePort("HTTP")
 
-	credentials := sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: SSH_PORT}
+	credentials := sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: getServicePort("SSH")}
 
 	// We expect an error here because the url is invalid
 	err := builder.PackageWP(credentials, invalidUrl, DOCUMENT_ROOT)
@@ -195,4 +183,50 @@ func assertRemoteFileDoesNotExist(t *testing.T, credentials sftp.SSHCredentials,
 	if ok {
 		t.Errorf("Expected file to not exist, but it did")
 	}
+}
+
+func newContainerService(name, portId, externalPort string, ready func() error) containerService {
+	return containerService{
+		name:   name,
+		portId: portId,
+		port:   externalPort,
+		ready:  ready,
+	}
+}
+
+func createContainerServices(resource *dockertest.Resource) []containerService {
+	return []containerService{
+		newContainerService("SSH", "22/tcp", resource.GetPort("22/tcp"), func() error {
+			conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", SSH_HOST, getServicePort("SSH")))
+			if err != nil {
+				return err
+			}
+			conn.Close()
+			return nil
+		}),
+		newContainerService("HTTP", "80/tcp", resource.GetPort("80/tcp"), func() error {
+			resp, err := http.Get(fmt.Sprintf("http://%s:%s", "localhost", getServicePort("HTTP")))
+			if err != nil || resp.StatusCode != 200 {
+				return fmt.Errorf("could not connect to http server: %s", err)
+			}
+			resp.Body.Close()
+			return nil
+		}),
+		newContainerService("MySQL", "3306/tcp", resource.GetPort("3306/tcp"), func() error {
+			db, err := sql.Open("mysql", fmt.Sprintf("root:%s@tcp(localhost:%s)/%s", MYSQL_ROOT_PASSWORD, getServicePort("MySQL"), MYSQL_DATABASE))
+			if err != nil {
+				return err
+			}
+			return db.Ping()
+		}),
+	}
+}
+
+func getServicePort(serviceName string) string {
+	for _, service := range services {
+		if service.name == serviceName {
+			return service.port
+		}
+	}
+	return ""
 }
