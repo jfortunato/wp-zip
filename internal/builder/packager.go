@@ -4,47 +4,45 @@ import (
 	"fmt"
 	"github.com/jfortunato/wp-zip/internal/sftp"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 )
 
-func PackageWP(sshCredentials sftp.SSHCredentials, publicUrl, publicPath string) {
+func PackageWP(sshCredentials sftp.SSHCredentials, publicUrl, publicPath string) error {
 	client, err := sftp.NewClient(sshCredentials)
 	if err != nil {
-		log.Fatalln(err)
+		return fmt.Errorf("error creating new client: %w", err)
 	}
 	defer client.Close()
 
-	operations, err := prepareOperations(client, PublicPath(publicPath))
+	operations, err := prepareOperations(client, publicUrl, PublicPath(publicPath))
 	if err != nil {
-		log.Fatalln(err)
+		return fmt.Errorf("error preparing operations: %w", err)
 	}
 
 	builder := &Builder{PublicPath(publicPath), operations}
-	if err != nil {
-		log.Fatalln(err)
-	}
 
 	wd, err := os.Getwd()
 	if err != nil {
-		log.Fatalln(err)
+		return fmt.Errorf("error getting working directory: %w", err)
 	}
 	filename := filepath.Join(wd, "wp.zip")
 
 	zipFile, err := os.Create(filename)
 	if err != nil {
-		log.Fatalln(err)
+		return fmt.Errorf("error creating zip file: %w", err)
 	}
 	defer zipFile.Close()
 
 	err = builder.PackageWP(zipFile)
 	if err != nil {
-		log.Fatalln(err)
+		return fmt.Errorf("error packaging WP: %w", err)
 	}
+
+	return nil
 }
 
-func prepareOperations(c *sftp.ClientWrapper, pathToPublic PublicPath) ([]Operation, error) {
+func prepareOperations(c *sftp.ClientWrapper, publicUrl string, pathToPublic PublicPath) ([]Operation, error) {
 	fileEmitter := initFileEmitter(c)
 
 	downloadFilesOperation, err := NewDownloadFilesOperation(fileEmitter, pathToPublic)
@@ -73,9 +71,18 @@ func prepareOperations(c *sftp.ClientWrapper, pathToPublic PublicPath) ([]Operat
 		credentials,
 	}}
 
+	generateJsonOperation := &GenerateJsonOperation{
+		u:           c,
+		g:           &BasicHttpGetter{},
+		publicUrl:   publicUrl,
+		publicPath:  pathToPublic,
+		credentials: credentials,
+	}
+
 	operations := []Operation{
 		downloadFilesOperation,
 		exportDatabaseOperation,
+		generateJsonOperation,
 	}
 
 	return operations, nil

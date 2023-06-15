@@ -2,6 +2,7 @@ package wp_zip
 
 import (
 	"errors"
+	"fmt"
 	"github.com/jfortunato/wp-zip/internal/builder"
 	"github.com/jfortunato/wp-zip/internal/sftp"
 	"github.com/spf13/cobra"
@@ -38,7 +39,12 @@ var rootCmd = &cobra.Command{
 	to another host or to create a local development environment.`,
 	Args: argsValidation(),
 	Run: func(cmd *cobra.Command, args []string) {
-		builder.PackageWP(sftp.SSHCredentials{User: Username, Pass: Password, Host: Host, Port: Port}, Domain, args[0])
+		publicUrl := fmt.Sprintf("https://%s", Domain)
+
+		err := builder.PackageWP(sftp.SSHCredentials{User: Username, Pass: Password, Host: Host, Port: Port}, publicUrl, args[0])
+		if err != nil {
+			log.Fatalln(err)
+		}
 	},
 }
 

@@ -276,17 +276,42 @@ func (c *ClientWrapper) RunRemoteCommand(command string) (io.Reader, error) {
 
 		sess, err := c.conn.NewSession()
 		if err != nil {
-			log.Fatalln("failed to create session: %w", err)
+			log.Printf("failed to create session: %s", err)
 		}
 		sess.Stdout = writer
 		defer sess.Close()
 
 		if err := sess.Run(command); err != nil {
-			log.Fatalln("failed to run command: %w", err)
+			log.Printf("failed to run command: %s", err)
 		}
 	}()
 
 	return reader, nil
+}
+
+func (c *ClientWrapper) Upload(r io.Reader, dst string) error {
+	w, err := c.wrapper.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+
+	// Copy the contents
+	_, err = io.Copy(w, r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *ClientWrapper) Delete(dst string) error {
+	err := c.wrapper.Remove(dst)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (c *ClientWrapper) downloadDirectoryWithTar(remoteDirectory string, localDirectory string) error {
