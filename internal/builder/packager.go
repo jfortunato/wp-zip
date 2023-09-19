@@ -8,27 +8,21 @@ import (
 	"path/filepath"
 )
 
-func PackageWP(sshCredentials sftp.SSHCredentials, publicUrl Domain, publicPath string) error {
+func PackageWP(sshCredentials sftp.SSHCredentials, publicUrl Domain, publicPath PublicPath, outputFilename string) error {
 	client, err := sftp.NewClient(sshCredentials)
 	if err != nil {
 		return fmt.Errorf("error creating new client: %w", err)
 	}
 	defer client.Close()
 
-	operations, err := prepareOperations(client, publicUrl, PublicPath(publicPath))
+	operations, err := prepareOperations(client, publicUrl, publicPath)
 	if err != nil {
 		return fmt.Errorf("error preparing operations: %w", err)
 	}
 
-	builder := &Builder{PublicPath(publicPath), operations}
+	builder := &Builder{publicPath, operations}
 
-	wd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("error getting working directory: %w", err)
-	}
-	filename := filepath.Join(wd, "wp.zip")
-
-	zipFile, err := os.Create(filename)
+	zipFile, err := os.Create(outputFilename)
 	if err != nil {
 		return fmt.Errorf("error creating zip file: %w", err)
 	}

@@ -104,10 +104,10 @@ func TestMain(m *testing.M) {
 func TestZipFileCreated(t *testing.T) {
 	domain := builder.Domain("localhost:" + getServicePort("HTTP"))
 
-	builder.PackageWP(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: getServicePort("SSH")}, domain, DOCUMENT_ROOT)
-
 	filename := outputFile()
 	defer cleanup(t, filename)
+
+	builder.PackageWP(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: getServicePort("SSH")}, domain, DOCUMENT_ROOT, filename)
 
 	assertZipContainsFiles(t, filename, []string{"files/index.php", "files/wp-config.php", "database.sql", "wpmigrate-export.json"})
 }
@@ -119,22 +119,20 @@ func TestUploadedFileIsAlwaysDeleted(t *testing.T) {
 
 	credentials := sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: getServicePort("SSH")}
 
+	filename := outputFile()
+	defer cleanup(t, filename)
+
 	// We expect an error here because the url is invalid
-	err := builder.PackageWP(credentials, invalidDomain, DOCUMENT_ROOT)
+	err := builder.PackageWP(credentials, invalidDomain, DOCUMENT_ROOT, filename)
 	if err == nil {
 		t.Errorf("Expected error, got nil")
 	}
-
-	filename := outputFile()
-	defer cleanup(t, filename)
 
 	assertRemoteFileDoesNotExist(t, credentials, DOCUMENT_ROOT, `wp-zip-[^.]+\.php`)
 }
 
 func outputFile() string {
-	wd, _ := os.Getwd()
-
-	return filepath.Join(wd, "wp.zip")
+	return filepath.Join(os.TempDir(), "wp.zip")
 }
 
 func cleanup(t *testing.T, zipFilename string) {
