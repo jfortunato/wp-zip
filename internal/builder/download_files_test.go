@@ -91,6 +91,10 @@ type MockFileEmitter struct {
 	files map[string]string
 }
 
+func (m *MockFileEmitter) CalculateByteSize(src string) int {
+	return 0
+}
+
 func (m *MockFileEmitter) EmitAll(src string, fn EmitFunc) error {
 	for name, body := range m.files {
 		fn(name, strings.NewReader(body))

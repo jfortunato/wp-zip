@@ -3,11 +3,13 @@ package builder
 import (
 	"archive/tar"
 	"github.com/pkg/sftp"
+	"github.com/schollz/progressbar/v3"
 	"golang.org/x/crypto/ssh"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -20,6 +22,7 @@ type EmitFunc func(path string, contents io.Reader)
 
 // A FileEmitter is basically a file downloader, but it doesn't actually download files to the filesystem. Instead, it just emits the file data (name, contents) and it's up to the caller to do something with it.
 type FileEmitter interface {
+	CalculateByteSize(src string) int
 	EmitAll(src string, fn EmitFunc) error
 	EmitSingle(src string, fn EmitFunc) error
 }
@@ -29,11 +32,15 @@ func NewDownloadFilesOperation(directoryEmitter FileEmitter, pathToPublic Public
 }
 
 func (o *DownloadFilesOperation) SendFiles(fn SendFilesFunc) error {
+	bar := progressbar.DefaultBytes(int64(o.emitter.CalculateByteSize(string(o.pathToPublic))), "Downloading files")
+	defer bar.Clear()
+
 	// Download the entire public directory and emit each file as they come in to the channel
 	return o.emitter.EmitAll(string(o.pathToPublic), func(path string, contents io.Reader) {
 		f := File{
 			Name: filepath.Join("files", path), // We want to store the files in the "files" directory
-			Body: contents,
+			// The progress bar is a writer, so we can write to it to update the progress
+			Body: io.TeeReader(contents, bar),
 		}
 
 		fn(f)
@@ -60,17 +67,34 @@ type TarFileEmitter struct {
 	client Client
 }
 
+func (t *TarFileEmitter) CalculateByteSize(src string) int {
+	sess, err := t.client.NewSession()
+	if err != nil {
+		log.Fatalln("failed to create session: %w", err)
+	}
+	defer sess.Close()
+
+	// Determine the total size of the directory in bytes
+	res, err := sess.Output("du -sb " + filepath.Dir(src) + " | awk '{print $1}'")
+	if err != nil {
+		log.Fatalln("failed to run find: %w", err)
+	}
+
+	// Convert the byte slice to a string, then convert the string to an int
+	numFiles, err := strconv.Atoi(strings.TrimSpace(string(res)))
+	if err != nil {
+		log.Fatalln("failed to convert string to int: %w", err)
+	}
+
+	return numFiles
+}
+
 func (t *TarFileEmitter) EmitAll(src string, fn EmitFunc) error {
 	return t.emit(src, ".", fn)
 }
 
 func (t *TarFileEmitter) EmitSingle(src string, fn EmitFunc) error {
-	paths := strings.Split(src, "/")
-
-	parentDirectory := strings.Join(paths[:len(paths)-1], "/")
-	filepathRelativeToParent := paths[len(paths)-1]
-
-	return t.emit(parentDirectory, filepathRelativeToParent, fn)
+	return t.emit(filepath.Dir(src), filepath.Base(src), fn)
 }
 
 func (t *TarFileEmitter) emit(parentDirectory, filepathRelativeToParent string, fn EmitFunc) error {
@@ -134,6 +158,12 @@ func (t *TarFileEmitter) emit(parentDirectory, filepathRelativeToParent string, 
 // SftpFileEmitter downloads each file individually over SFTP. This is much slower than the TarFileEmitter, but is useful when the remote server doesn't have `tar` installed or otherwise doesn't support it.
 type SftpFileEmitter struct {
 	client Client
+}
+
+func (s *SftpFileEmitter) CalculateByteSize(src string) int {
+	// Takes too long to calculate the size of the directory, so just return -1 which indicates
+	// to the progress bar to use an indeterminate spinner
+	return -1
 }
 
 func (s *SftpFileEmitter) EmitAll(src string, fn EmitFunc) error {
