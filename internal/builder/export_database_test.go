@@ -70,20 +70,62 @@ func TestMysqldumpDatabaseExporter_Export(t *testing.T) {
 	})
 
 	t.Run("it uses mysqldump to export to the reader", func(t *testing.T) {
-		expectedOutput := "mysqldump Dbname output"
+		var tests = []struct {
+			name     string
+			creds    DatabaseCredentials
+			checkCmd string
+			dumpCmd  string
+		}{
+			{
+				"no special chars",
+				DatabaseCredentials{"User", "Pass", "Dbname"},
+				`mysql -u'User' -p'Pass' Dbname -e"quit"`,
+				"mysqldump --no-tablespaces -u'User' -p'Pass' Dbname",
+			},
+			{
+				"single quote in middle of password",
+				DatabaseCredentials{"User", "Pa'ss", "Dbname"},
+				`mysql -u'User' -p'Pa'\''ss' Dbname -e"quit"`,
+				`mysqldump --no-tablespaces -u'User' -p'Pa'\''ss' Dbname`,
+			},
+			{
+				"single quote at beginning of password",
+				DatabaseCredentials{"User", "'Pass", "Dbname"},
+				`mysql -u'User' -p''\''Pass' Dbname -e"quit"`,
+				`mysqldump --no-tablespaces -u'User' -p''\''Pass' Dbname`,
+			},
+			{
+				"single quote at end of password",
+				DatabaseCredentials{"User", "Pass'", "Dbname"},
+				`mysql -u'User' -p'Pass'\''' Dbname -e"quit"`,
+				`mysqldump --no-tablespaces -u'User' -p'Pass'\''' Dbname`,
+			},
+			{
+				"double quote in middle of password",
+				DatabaseCredentials{"User", `Pa"ss`, "Dbname"},
+				`mysql -u'User' -p'Pa"ss' Dbname -e"quit"`,
+				`mysqldump --no-tablespaces -u'User' -p'Pa"ss' Dbname`,
+			},
+		}
 
-		commandRunner := &MockCommandRunner{commandsThatExist: map[string]string{
-			"mysqldump --version":                             "mysqldump Ver 1.0",
-			"mysql -uUser -pPass Dbname -e\"quit\"":           "",
-			"mysqldump --no-tablespaces -uUser -pPass Dbname": expectedOutput,
-		}}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				expectedOutput := "mysqldump Dbname output"
 
-		exporter := &MysqldumpDatabaseExporter{commandRunner, DatabaseCredentials{"User", "Pass", "Dbname"}}
+				commandRunner := &MockCommandRunner{commandsThatExist: map[string]string{
+					"mysqldump --version": "mysqldump Ver 1.0",
+					test.checkCmd:         "",
+					test.dumpCmd:          expectedOutput,
+				}}
 
-		r, _ := exporter.Export()
+				exporter := &MysqldumpDatabaseExporter{commandRunner, test.creds}
 
-		if readerToString(r) != expectedOutput {
-			t.Errorf("exporter.Export() returned %s; want %s", r, expectedOutput)
+				r, _ := exporter.Export()
+
+				if readerToString(r) != expectedOutput {
+					t.Errorf("exporter.Export() returned %s; want %s", r, expectedOutput)
+				}
+			})
 		}
 	})
 }

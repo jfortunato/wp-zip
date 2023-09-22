@@ -3,6 +3,7 @@ package builder
 import (
 	"errors"
 	"io"
+	"strings"
 )
 
 type ExportDatabaseOperation struct {
@@ -46,9 +47,14 @@ func (e *MysqldumpDatabaseExporter) Export() (io.Reader, error) {
 		return nil, errors.New("mysqldump command not found")
 	}
 
-	credentialsString := "-u" + e.credentials.User + " -p" + e.credentials.Pass + " " + e.credentials.Name
+	// Since the credentials are wrapped in single quotes, we need to replace any single quotes in the credentials.
+	// For example, if the password is "password'123", we need to replace the single quote with '\'' so that the command
+	// looks like this: -p'password'\''123'
+	pass := strings.ReplaceAll(e.credentials.Pass, "'", `'\''`)
 
-	if !e.commandRunner.CanRunRemoteCommand("mysql " + credentialsString + " -e\"quit\"") {
+	credentialsString := "-u'" + e.credentials.User + "' -p'" + pass + "' " + e.credentials.Name
+
+	if !e.commandRunner.CanRunRemoteCommand("mysql " + credentialsString + ` -e"quit"`) {
 		return nil, errors.New("MySQL credentials are incorrect")
 	}
 
