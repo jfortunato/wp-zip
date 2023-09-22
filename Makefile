@@ -43,9 +43,9 @@ release: platform-linux platform-darwin platform-windows
 	cd build && tar -zcf release/wp-zip-$(VERSION)-Linux_arm64.tar.gz wp-zip-linux-arm64
 	cd build && tar -zcf release/wp-zip-$(VERSION)-Darwin_x86_64.tar.gz wp-zip-darwin-amd64
 	cd build && tar -zcf release/wp-zip-$(VERSION)-Darwin_arm64.tar.gz wp-zip-darwin-arm64
-	cd build && zip release/wp-zip-$(VERSION)-Windows_x86_64.zip wp-zip-windows-amd64
-	cd build && zip release/wp-zip-$(VERSION)-Windows_i386.zip wp-zip-windows-386
-	cd build && zip release/wp-zip-$(VERSION)-Windows_arm64.zip wp-zip-windows-arm64
+	cd build && zip -r release/wp-zip-$(VERSION)-Windows_x86_64.zip wp-zip-windows-amd64
+	cd build && zip -r release/wp-zip-$(VERSION)-Windows_i386.zip wp-zip-windows-386
+	cd build && zip -r release/wp-zip-$(VERSION)-Windows_arm64.zip wp-zip-windows-arm64
 	cd build/release && sha256sum wp-zip-$(VERSION)-Linux_x86_64.tar.gz >> checksums.txt
 	cd build/release && sha256sum wp-zip-$(VERSION)-Linux_i386.tar.gz >> checksums.txt
 	cd build/release && sha256sum wp-zip-$(VERSION)-Linux_arm64.tar.gz >> checksums.txt
