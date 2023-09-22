@@ -7,7 +7,6 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -46,7 +45,8 @@ func (o *GenerateJsonOperation) SendFiles(fn SendFilesFunc) (err error) {
 
 	// 1.
 	// Generate a random filename
-	uploadFilename := filepath.Join(string(o.publicPath), o.randomFileNamer())
+	basename := o.randomFileNamer()
+	uploadFilename := string(o.publicPath) + "/" + basename
 	err = o.u.Upload(strings.NewReader(getPhpFileContents(o.credentials, o.publicUrl, o.publicPath)), uploadFilename)
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrCouldNotUploadFile, err)
@@ -61,7 +61,6 @@ func (o *GenerateJsonOperation) SendFiles(fn SendFilesFunc) (err error) {
 	}()
 
 	// 2.
-	basename := filepath.Base(uploadFilename)
 	resp, err := o.g.Get(o.publicUrl.AsSecureUrl() + "/" + basename)
 	if err != nil {
 		// Try an insecure URL before returning an error

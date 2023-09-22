@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -38,7 +37,7 @@ func (o *DownloadFilesOperation) SendFiles(fn SendFilesFunc) error {
 	// Download the entire public directory and emit each file as they come in to the channel
 	return o.emitter.EmitAll(string(o.pathToPublic), func(path string, contents io.Reader) {
 		f := File{
-			Name: filepath.Join("files", path), // We want to store the files in the "files" directory
+			Name: "files/" + path, // We want to store the files in the "files" directory
 			// The progress bar is a writer, so we can write to it to update the progress
 			Body: io.TeeReader(contents, bar),
 		}
@@ -68,6 +67,8 @@ type TarFileEmitter struct {
 }
 
 func (t *TarFileEmitter) CalculateByteSize(src string) int {
+	parentDirectory, _ := separateParentFromFilename(src)
+
 	sess, err := t.client.NewSession()
 	if err != nil {
 		log.Fatalln("failed to create session: %w", err)
@@ -75,7 +76,7 @@ func (t *TarFileEmitter) CalculateByteSize(src string) int {
 	defer sess.Close()
 
 	// Determine the total size of the directory in bytes
-	res, err := sess.Output("du -sb " + filepath.Dir(src) + " | awk '{print $1}'")
+	res, err := sess.Output("du -sb " + parentDirectory + " | awk '{print $1}'")
 	if err != nil {
 		log.Fatalln("failed to run find: %w", err)
 	}
@@ -94,7 +95,9 @@ func (t *TarFileEmitter) EmitAll(src string, fn EmitFunc) error {
 }
 
 func (t *TarFileEmitter) EmitSingle(src string, fn EmitFunc) error {
-	return t.emit(filepath.Dir(src), filepath.Base(src), fn)
+	parentDirectory, filepathRelativeToParent := separateParentFromFilename(src)
+
+	return t.emit(parentDirectory, filepathRelativeToParent, fn)
 }
 
 func (t *TarFileEmitter) emit(parentDirectory, filepathRelativeToParent string, fn EmitFunc) error {
@@ -141,7 +144,7 @@ func (t *TarFileEmitter) emit(parentDirectory, filepathRelativeToParent string, 
 			}
 		}
 
-		targetPath := filepath.Join(paths...)
+		targetPath := strings.Join(paths, "/")
 
 		// If the file is a directory, we don't need to do anything
 		if header.FileInfo().IsDir() {
@@ -173,7 +176,7 @@ func (s *SftpFileEmitter) EmitAll(src string, fn EmitFunc) error {
 		return err
 	}
 	for _, remoteFile := range remoteFiles {
-		remoteFilepath := filepath.Join(src, remoteFile.Name())
+		remoteFilepath := src + "/" + remoteFile.Name()
 
 		// If the file is a directory, recursively emit it
 		if remoteFile.IsDir() {
@@ -203,4 +206,14 @@ func (s *SftpFileEmitter) EmitSingle(src string, fn EmitFunc) error {
 	fn(src, r)
 
 	return nil
+}
+
+// Helper function that returns the parent directory and the basename of the file similar
+// to filepath.Dir() and filepath.Base(), but always assumes unix-style paths.
+func separateParentFromFilename(src string) (string, string) {
+	paths := strings.Split(src, "/")
+	parentDirectory := strings.Join(paths[:len(paths)-1], "/")
+	filepathRelativeToParent := paths[len(paths)-1]
+
+	return parentDirectory, filepathRelativeToParent
 }

@@ -5,7 +5,6 @@ import (
 	"github.com/jfortunato/wp-zip/internal/sftp"
 	"io"
 	"os"
-	"path/filepath"
 )
 
 func PackageWP(sshCredentials sftp.SSHCredentials, publicUrl Domain, publicPath PublicPath, outputFilename string) error {
@@ -46,7 +45,7 @@ func prepareOperations(c *sftp.ClientWrapper, publicUrl Domain, pathToPublic Pub
 
 	// Download/read the wp-config.php file
 	var wpConfigFileContents string
-	err = fileEmitter.EmitSingle(filepath.Join(string(pathToPublic), "wp-config.php"), func(path string, contents io.Reader) {
+	err = fileEmitter.EmitSingle(string(pathToPublic)+"/wp-config.php", func(path string, contents io.Reader) {
 		wpConfigFileContents = readerToString(contents)
 	})
 	if err != nil {
