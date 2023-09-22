@@ -67,8 +67,6 @@ type TarFileEmitter struct {
 }
 
 func (t *TarFileEmitter) CalculateByteSize(src string) int {
-	parentDirectory, _ := separateParentFromFilename(src)
-
 	sess, err := t.client.NewSession()
 	if err != nil {
 		log.Fatalln("failed to create session: %w", err)
@@ -76,7 +74,7 @@ func (t *TarFileEmitter) CalculateByteSize(src string) int {
 	defer sess.Close()
 
 	// Determine the total size of the directory in bytes
-	res, err := sess.Output("du -sb " + parentDirectory + " | awk '{print $1}'")
+	res, err := sess.Output("du -sb " + src + " | awk '{print $1}'")
 	if err != nil {
 		log.Fatalln("failed to run find: %w", err)
 	}
