@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/jfortunato/wp-zip/compare/v0.1.0...v0.1.1) (2023-09-22)
+
+
+### Miscellaneous Chores
+
+* release 0.1.1 ([0ad9017](https://github.com/jfortunato/wp-zip/commit/0ad9017a3107fc27ccdcb4a24ac7c6a6b8369e01))
+
 ## [0.1.0](https://github.com/jfortunato/wp-zip/compare/0.0.1-alpha...v0.1.0) (2023-09-22)
 
 
