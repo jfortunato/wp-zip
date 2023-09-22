@@ -5,7 +5,7 @@ Quickly archive a live WordPress site to a local zip file.
 ## Usage
 
 ```bash
-wp-zip -h <sftp-host> -u <sftp-user> -p <sftp-password> -d <domain> path/to/public/
+wp-zip -h <sftp-host> -u <sftp-user> -p <sftp-password> -d <domain> -w path/to/public/ output.zip
 ```
 
 You must already have access to the site via SFTP. The -d flag represents the live domain name of the site, for example 'example.com' The path to the public directory is the path to the WordPress installation (the directory that wp-config.php lives under).
