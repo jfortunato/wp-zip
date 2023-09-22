@@ -128,7 +128,8 @@ func parseDatabaseCredentials(contents string) (DatabaseCredentials, error) {
 }
 
 func parseWpConfigField(contents, field string) (string, error) {
-	re := regexp.MustCompile(`define\(['"]` + field + `['"], ['"](.*)['"]\);`)
+	// TODO: Add tests for multiple different formats for these fields
+	re := regexp.MustCompile(`define\( ?['"]` + field + `['"], ['"](.*)['"] ?\);`)
 	matches := re.FindStringSubmatch(contents)
 	if len(matches) != 2 {
 		return "", fmt.Errorf("could not parse %s from wp-config.php", field)
