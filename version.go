@@ -1,3 +1,3 @@
 package main
 
-const wpZipVersion = "0.0.1-alpha"
+const version = "v0.0.2" // x-release-please-version

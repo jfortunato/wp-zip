@@ -1,9 +1,16 @@
 package main
 
-import (
-	wp_zip "github.com/jfortunato/wp-zip/cmd/wp-zip"
+import cmd "github.com/jfortunato/wp-zip/cmd/wp-zip"
+
+var (
+	commit = "none"
+	date   = "unknown"
 )
 
 func main() {
-	wp_zip.Execute(wpZipVersion)
+	cmd.Execute(cmd.VersionDetails{
+		Version: version,
+		Commit:  commit,
+		Date:    date,
+	})
 }

@@ -8,6 +8,12 @@ import (
 	"log"
 )
 
+type VersionDetails struct {
+	Version string
+	Commit  string
+	Date    string
+}
+
 var Host string
 var Username string
 var Password string
@@ -34,8 +40,8 @@ func init() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:     "wp-zip -h sftp-host -u sftp-username -p sftp-password -d example.com -w path-to-webroot [flags] output-filename",
-	Short:   "Export an existing WordPress site to a zip file",
+	Use:   "wp-zip -h sftp-host -u sftp-username -p sftp-password -d example.com -w path-to-webroot [flags] output-filename",
+	Short: "Export an existing WordPress site to a zip file",
 	Long: `Generate a complete archive of a WordPress site's files
 	and database, which can be used to migrate the site
 	to another host or to create a local development environment.`,
@@ -59,8 +65,8 @@ func argsValidation() cobra.PositionalArgs {
 	}
 }
 
-func Execute(version string) {
-	rootCmd.Version = version
+func Execute(v VersionDetails) {
+	rootCmd.Version = v.Version
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatalln(err)
