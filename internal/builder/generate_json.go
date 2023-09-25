@@ -131,7 +131,7 @@ $wpVersion = isset($matches[1]) ? $matches[1] : '';
 
 header('Content-Type: application/json');
 echo json_encode(array_merge_recursive([
-    'name' => 'Migrated Site',
+    'name' => '%s',
     'domain' => '%s',
     'path' => '%s',
     'wpVersion' => $wpVersion,
@@ -146,7 +146,7 @@ echo json_encode(array_merge_recursive([
         ],
     ],
 ], ['services' => $serverJson]));
-`, credentials.User, credentials.Pass, credentials.Name, publicUrl, publicPath)
+`, credentials.User, credentials.Pass, credentials.Name, publicUrl, publicUrl, publicPath)
 }
 
 type BasicHttpGetter struct{}
