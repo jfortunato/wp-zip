@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.0](https://github.com/jfortunato/wp-zip/compare/v0.1.1...v0.2.0) (2023-09-25)
+
+
+### Features
+
+* Use site domain as localwp imported name ([c9da74d](https://github.com/jfortunato/wp-zip/commit/c9da74d67532a6679ad95f61213614e97049e58a))
+
+
+### Bug Fixes
+
+* Allow wp-config fields to use spaces ([748405a](https://github.com/jfortunato/wp-zip/commit/748405ad19d9f7e5836977c5b71ad0371d1054ff))
+* Handle additional wp-config parsing cases ([40aebb0](https://github.com/jfortunato/wp-zip/commit/40aebb040cddfddf794ceb715001a0e19f38519a))
+* Handle special chars in mysql cli password ([3733dff](https://github.com/jfortunato/wp-zip/commit/3733dffb6cc49264ae0b85eab81d88c2cb101bb9))
+* Properly calculate size of public site files for progress bar ([69ff722](https://github.com/jfortunato/wp-zip/commit/69ff7225ce65f2f568efa71ca9dbb6b12e8d86a7))
+
 ## [0.1.1](https://github.com/jfortunato/wp-zip/compare/v0.1.0...v0.1.1) (2023-09-22)
 
 
