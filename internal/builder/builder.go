@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/jfortunato/wp-zip/internal/sftp"
 	"io"
-	"regexp"
 	"strings"
 )
 
@@ -111,28 +110,4 @@ func readerToString(r io.Reader) string {
 		panic(err)
 	}
 	return buf.String()
-}
-
-func parseDatabaseCredentials(contents string) (DatabaseCredentials, error) {
-	var fields = map[string]string{"DB_USER": "", "DB_PASSWORD": "", "DB_NAME": ""}
-
-	for field, _ := range fields {
-		value, err := parseWpConfigField(contents, field)
-		if err != nil {
-			return DatabaseCredentials{}, err
-		}
-		fields[field] = value
-	}
-
-	return DatabaseCredentials{User: fields["DB_USER"], Pass: fields["DB_PASSWORD"], Name: fields["DB_NAME"]}, nil
-}
-
-func parseWpConfigField(contents, field string) (string, error) {
-	// TODO: Add tests for multiple different formats for these fields
-	re := regexp.MustCompile(`define\( ?['"]` + field + `['"], ['"](.*)['"] ?\);`)
-	matches := re.FindStringSubmatch(contents)
-	if len(matches) != 2 {
-		return "", fmt.Errorf("could not parse %s from wp-config.php", field)
-	}
-	return matches[1], nil
 }

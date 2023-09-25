@@ -54,7 +54,8 @@ func prepareOperations(c *sftp.ClientWrapper, publicUrl Domain, pathToPublic Pub
 	if wpConfigFileContents == "" {
 		return nil, fmt.Errorf("could not read wp-config.php")
 	}
-	credentials, err := parseDatabaseCredentials(wpConfigFileContents)
+
+	credentials, err := ParseDatabaseCredentials(wpConfigFileContents)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing database credentials: %s", err)
 	}

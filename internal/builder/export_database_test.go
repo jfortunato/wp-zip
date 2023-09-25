@@ -130,6 +130,67 @@ func TestMysqldumpDatabaseExporter_Export(t *testing.T) {
 	})
 }
 
+func TestParseDatabaseCredentials(t *testing.T) {
+	t.Run("it can parse a wp-config.php file and extract the database credentials", func(t *testing.T) {
+		var tests = []struct {
+			name     string
+			contents string
+			expected DatabaseCredentials
+		}{
+			{
+				"basic",
+				`<?php
+				define('DB_USER', 'user');
+				define('DB_PASSWORD', 'pass');
+				define('DB_NAME', 'dbname');
+				`,
+				DatabaseCredentials{"user", "pass", "dbname"},
+			},
+			{
+				"spaces",
+				`<?php
+				// Before/after opening/closing parenthesis
+				define( 'DB_USER', 'user' );
+				// Extra spaces
+				define(   'DB_PASSWORD',   'pass'   );
+				// No spaces
+				define('DB_NAME','dbname');
+				`,
+				DatabaseCredentials{"user", "pass", "dbname"},
+			},
+			{
+				"double quotes",
+				`<?php
+				define( "DB_USER", "user" );
+				define( "DB_PASSWORD", "pass" );
+				define( "DB_NAME", "dbname" );
+				`,
+				DatabaseCredentials{"user", "pass", "dbname"},
+			},
+			{
+				"quote usage in values",
+				`<?php
+				define('DB_USER', 'us"er');
+				define('DB_PASSWORD', "pa'ss");
+				define('DB_NAME', 'dbname');
+				`,
+				DatabaseCredentials{"us\"er", "pa'ss", "dbname"},
+			},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				creds, _ := ParseDatabaseCredentials(test.contents)
+
+				// Assert that the credentials are what we expect
+				if creds != test.expected {
+					t.Errorf("ParseDatabaseCredentials() returned %v; want %v", creds, test.expected)
+				}
+			})
+		}
+	})
+}
+
 type MockDatabaseExporter struct {
 	contentsStub io.Reader
 	errorStub    error
