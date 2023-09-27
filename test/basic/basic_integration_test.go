@@ -1,6 +1,6 @@
 //go:build integration
 
-package integration_test
+package basic_test
 
 import (
 	"archive/zip"
@@ -43,6 +43,13 @@ type containerService struct {
 var services []containerService
 
 func TestMain(m *testing.M) {
+	pool, resource := setup()
+	code := m.Run()
+	teardown(pool, resource)
+	os.Exit(code)
+}
+
+func setup() (*dockertest.Pool, *dockertest.Resource) {
 	// uses a sensible default on windows (tcp/http) and linux/osx (socket)
 	pool, err := dockertest.NewPool("")
 	if err != nil {
@@ -91,14 +98,14 @@ func TestMain(m *testing.M) {
 		log.Fatalf("Could not connect to one of the container services: %s", err)
 	}
 
-	code := m.Run()
+	return pool, resource
+}
 
+func teardown(pool *dockertest.Pool, resource *dockertest.Resource) {
 	// You can't defer this because os.Exit doesn't care for defer
 	if err := pool.Purge(resource); err != nil {
 		log.Fatalf("Could not purge resource: %s", err)
 	}
-
-	os.Exit(code)
 }
 
 func TestZipFileCreated(t *testing.T) {
