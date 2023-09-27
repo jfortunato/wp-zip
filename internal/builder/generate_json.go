@@ -30,6 +30,7 @@ var (
 type FileUploadDeleter interface {
 	Upload(r io.Reader, dst string) error
 	Delete(dst string) error
+	Mkdir(dst string) error
 }
 
 type HttpGetter interface {

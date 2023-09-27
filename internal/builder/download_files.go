@@ -36,6 +36,9 @@ func (o *DownloadFilesOperation) SendFiles(fn SendFilesFunc) error {
 
 	// Download the entire public directory and emit each file as they come in to the channel
 	return o.emitter.EmitAll(string(o.pathToPublic), func(path string, contents io.Reader) {
+		// Remove the leading pathToPublic from the path
+		path = strings.TrimPrefix(path, o.pathToPublic.String())
+
 		f := File{
 			Name: "files/" + path, // We want to store the files in the "files" directory
 			// The progress bar is a writer, so we can write to it to update the progress

@@ -129,6 +129,10 @@ func (m *MockFileUploadDeleter) Delete(dst string) error {
 	return m.deleteErrorStub
 }
 
+func (m *MockFileUploadDeleter) Mkdir(dst string) error {
+	return nil
+}
+
 type GetterResponse struct {
 	resp io.ReadCloser
 	err  error

@@ -60,14 +60,13 @@ func prepareOperations(c *sftp.ClientWrapper, publicUrl Domain, pathToPublic Pub
 		return nil, fmt.Errorf("error parsing database credentials: %s", err)
 	}
 
-	exportDatabaseOperation := &ExportDatabaseOperation{&MysqldumpDatabaseExporter{
-		c,
-		credentials,
-	}}
+	g := &BasicHttpGetter{}
+
+	exportDatabaseOperation := &ExportDatabaseOperation{NewDatabaseExporter(c, c, pathToPublic, publicUrl, g, fileEmitter, credentials)}
 
 	generateJsonOperation := &GenerateJsonOperation{
 		u:           c,
-		g:           &BasicHttpGetter{},
+		g:           g,
 		publicUrl:   publicUrl,
 		publicPath:  pathToPublic,
 		credentials: credentials,

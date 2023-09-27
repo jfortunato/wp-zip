@@ -134,6 +134,15 @@ func (c *ClientWrapper) Delete(dst string) error {
 	return nil
 }
 
+func (c *ClientWrapper) Mkdir(dst string) error {
+	err := c.wrapper.Mkdir(dst)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (c *ClientWrapper) Close() error {
 	defer c.wrapper.Close()
 	return c.conn.Close()
