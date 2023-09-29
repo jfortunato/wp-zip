@@ -1,44 +1,10 @@
-package builder
+package database
 
 import (
-	"errors"
 	"io"
 	"strings"
 	"testing"
 )
-
-func TestExportDatabaseOperation_SendFiles(t *testing.T) {
-	t.Run("it sends the remote database using the exporter", func(t *testing.T) {
-		var tests = []struct {
-			exporterResult   io.Reader
-			expectedContents string
-		}{
-			{strings.NewReader("database.sql contents"), "database.sql contents"},
-			{strings.NewReader("database.sql other contents"), "database.sql other contents"},
-		}
-
-		for _, test := range tests {
-			operation := &ExportDatabaseOperation{&MockDatabaseExporter{contentsStub: test.exporterResult}}
-
-			expectFilesSentFromOperation(t, operation, map[string]string{
-				"database.sql": test.expectedContents,
-			})
-		}
-	})
-
-	t.Run("it returns an error if the exporter fails", func(t *testing.T) {
-		operation := &ExportDatabaseOperation{&MockDatabaseExporter{errorStub: errors.New("exporter error")}}
-
-		// Assert error returned
-		err := operation.SendFiles(nil)
-		if err == nil || err.Error() != "exporter error" {
-			t.Errorf("operation.SendFiles() returned nil; want error")
-		}
-
-		// Assert no files sent
-		expectFilesSentFromOperation(t, operation, map[string]string{})
-	})
-}
 
 func TestMysqldumpDatabaseExporter_Export(t *testing.T) {
 	t.Run("it returns an error if the remote server cannot run the mysqldump command", func(t *testing.T) {
@@ -128,76 +94,6 @@ func TestMysqldumpDatabaseExporter_Export(t *testing.T) {
 			})
 		}
 	})
-}
-
-func TestParseDatabaseCredentials(t *testing.T) {
-	t.Run("it can parse a wp-config.php file and extract the database credentials", func(t *testing.T) {
-		var tests = []struct {
-			name     string
-			contents string
-			expected DatabaseCredentials
-		}{
-			{
-				"basic",
-				`<?php
-				define('DB_USER', 'user');
-				define('DB_PASSWORD', 'pass');
-				define('DB_NAME', 'dbname');
-				`,
-				DatabaseCredentials{"user", "pass", "dbname"},
-			},
-			{
-				"spaces",
-				`<?php
-				// Before/after opening/closing parenthesis
-				define( 'DB_USER', 'user' );
-				// Extra spaces
-				define(   'DB_PASSWORD',   'pass'   );
-				// No spaces
-				define('DB_NAME','dbname');
-				`,
-				DatabaseCredentials{"user", "pass", "dbname"},
-			},
-			{
-				"double quotes",
-				`<?php
-				define( "DB_USER", "user" );
-				define( "DB_PASSWORD", "pass" );
-				define( "DB_NAME", "dbname" );
-				`,
-				DatabaseCredentials{"user", "pass", "dbname"},
-			},
-			{
-				"quote usage in values",
-				`<?php
-				define('DB_USER', 'us"er');
-				define('DB_PASSWORD', "pa'ss");
-				define('DB_NAME', 'dbname');
-				`,
-				DatabaseCredentials{"us\"er", "pa'ss", "dbname"},
-			},
-		}
-
-		for _, test := range tests {
-			t.Run(test.name, func(t *testing.T) {
-				creds, _ := ParseDatabaseCredentials(test.contents)
-
-				// Assert that the credentials are what we expect
-				if creds != test.expected {
-					t.Errorf("ParseDatabaseCredentials() returned %v; want %v", creds, test.expected)
-				}
-			})
-		}
-	})
-}
-
-type MockDatabaseExporter struct {
-	contentsStub io.Reader
-	errorStub    error
-}
-
-func (m *MockDatabaseExporter) Export() (io.Reader, error) {
-	return m.contentsStub, m.errorStub
 }
 
 type MockCommandRunner struct {

@@ -7,8 +7,9 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/jfortunato/wp-zip/internal/builder"
+	"github.com/jfortunato/wp-zip/internal/packager"
 	"github.com/jfortunato/wp-zip/internal/sftp"
+	"github.com/jfortunato/wp-zip/internal/types"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"log"
@@ -109,12 +110,13 @@ func teardown(pool *dockertest.Pool, resource *dockertest.Resource) {
 }
 
 func TestZipFileCreated(t *testing.T) {
-	domain := builder.Domain("localhost:" + getServicePort("HTTP"))
+	domain := types.Domain("localhost:" + getServicePort("HTTP"))
 
 	filename := outputFile()
 	defer cleanup(t, filename)
 
-	builder.PackageWP(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: getServicePort("SSH")}, domain, DOCUMENT_ROOT, filename)
+	p, _ := packager.NewPackager(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: getServicePort("SSH")}, domain, DOCUMENT_ROOT)
+	_ = p.PackageWP(filename)
 
 	assertZipContainsFiles(t, filename, []string{"files/index.php", "files/wp-config.php", "database.sql", "wpmigrate-export.json"})
 }
@@ -122,7 +124,7 @@ func TestZipFileCreated(t *testing.T) {
 func TestUploadedFileIsAlwaysDeleted(t *testing.T) {
 	// When an invalid url is passed to the builder, it runs successfully up until it needs to generate the json file
 	// and send an http request.
-	invalidDomain := builder.Domain("localhost:8888")
+	invalidDomain := types.Domain("localhost:8888")
 
 	credentials := sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: getServicePort("SSH")}
 
@@ -130,7 +132,8 @@ func TestUploadedFileIsAlwaysDeleted(t *testing.T) {
 	defer cleanup(t, filename)
 
 	// We expect an error here because the url is invalid
-	err := builder.PackageWP(credentials, invalidDomain, DOCUMENT_ROOT, filename)
+	p, _ := packager.NewPackager(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: getServicePort("SSH")}, invalidDomain, DOCUMENT_ROOT)
+	err := p.PackageWP(filename)
 	if err == nil {
 		t.Errorf("Expected error, got nil")
 	}

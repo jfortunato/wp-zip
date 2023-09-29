@@ -1,59 +1,53 @@
-package builder
+package packager
 
 import (
 	"archive/zip"
 	"bytes"
 	"errors"
+	"github.com/jfortunato/wp-zip/internal/operations"
 	"strings"
 	"testing"
 )
 
-func TestPackageWP(t *testing.T) {
-	t.Run("it runs the appropriate operations to build a zip archive", func(t *testing.T) {
+func TestRunner_Run(t *testing.T) {
+	t.Run("it runs the operations to build a zip archive", func(t *testing.T) {
 		filesOnServer := map[string]string{
 			"index.php":     "index.php contents",
 			"wp-config.php": "wp-config.php contents",
 		}
 
-		operations := []Operation{&MockOperation{filesToSend: filesOnServer}}
+		ops := []operations.Operation{&MockOperation{filesToSend: filesOnServer}}
+
+		runner := &Runner{}
 
 		b := &bytes.Buffer{}
-		builder := &Builder{"/var/www/html/", operations}
-		builder.PackageWP(b)
+		err := runner.Run(ops, b)
+
+		if err != nil {
+			t.Errorf("got error %v; want nil", err)
+		}
 
 		expectZipContents(t, b, filesOnServer)
 	})
 
-	//t.Run("it should not attempt any operations if it cannot read the wp-config file", func(t *testing.T) {
-	//	filesOnServer := map[string]string{
-	//		"index.php": "index.php contents",
-	//	}
-	//
-	//	mockedEmitter := &MockFileEmitter{filesOnServer}
-	//	operation := &MockOperation{}
-	//
-	//	b := &bytes.Buffer{}
-	//	builder := &Builder{mockedEmitter, "/var/www/html/", []Operation{operation}}
-	//	builder.PackageWP(b)
-	//
-	//	// Assert that the operation was not called
-	//	if operation.sendFilesCalled != 0 {
-	//		t.Errorf("operation.SendFiles() was called %d times; want 0", operation.sendFilesCalled)
-	//	}
-	//
-	//	// Assert the buffer is empty
-	//	if b.Len() != 0 {
-	//		t.Errorf("buffer is not empty; want empty buffer")
-	//	}
-	//})
+	t.Run("it should return an error if there are no operations", func(t *testing.T) {
+		runner := &Runner{}
+
+		err := runner.Run([]operations.Operation{}, nil)
+
+		if !errors.Is(err, ErrNoOperations) {
+			t.Errorf("got error %v; want ErrNoOperations", err)
+		}
+	})
 
 	t.Run("it should return any error during an operations send files", func(t *testing.T) {
 		// Use an ErrorOperation to force an error
-		operations := []Operation{&ErrorOperation{}}
+		ops := []operations.Operation{&ErrorOperation{}}
+
+		runner := &Runner{}
 
 		b := &bytes.Buffer{}
-		builder := &Builder{"/var/www/html/", operations}
-		err := builder.PackageWP(b)
+		err := runner.Run(ops, b)
 
 		if err == nil || !strings.Contains(err.Error(), "error from ErrorOperation") {
 			t.Errorf("got error %v; want error from ErrorOperation", err)
@@ -62,53 +56,27 @@ func TestPackageWP(t *testing.T) {
 		expectZipContents(t, b, map[string]string{})
 	})
 
-	t.Run("empty operations", func(t *testing.T) {
-		b := &bytes.Buffer{}
-		builder := &Builder{"/var/www/html/", []Operation{}}
-		err := builder.PackageWP(b)
-
-		_, ok := err.(*ErrNoOperations)
-		if !ok {
-			t.Errorf("got error %v; want ErrNoOperations", err)
-		}
-	})
-
 	t.Run("multiple operations", func(t *testing.T) {
 		filesOnServer := map[string]string{
 			"index.php":     "index.php contents",
 			"wp-config.php": "wp-config.php contents",
 		}
 
-		operations := []Operation{
+		ops := []operations.Operation{
 			&MockOperation{filesToSend: map[string]string{"index.php": "index.php contents"}},
 			&MockOperation{filesToSend: map[string]string{"wp-config.php": "wp-config.php contents"}},
 		}
 
+		runner := &Runner{}
+
 		b := &bytes.Buffer{}
-		builder := &Builder{"/var/www/html/", operations}
-		builder.PackageWP(b)
+		err := runner.Run(ops, b)
+
+		if err != nil {
+			t.Errorf("got error %v; want nil", err)
+		}
 
 		expectZipContents(t, b, filesOnServer)
-	})
-}
-
-func TestPublicPath_String(t *testing.T) {
-	t.Run("it should always end in forward slash when converting to string", func(t *testing.T) {
-		var tests = []struct {
-			input    string
-			expected string
-		}{
-			{"/srv/", "/srv/"},
-			{"/srv", "/srv/"},
-			{"/", "/"},
-		}
-
-		for _, test := range tests {
-			path := PublicPath(test.input)
-			if path.String() != test.expected {
-				t.Errorf("got %s; want %s", path.String(), test.expected)
-			}
-		}
 	})
 }
 
@@ -117,11 +85,11 @@ type MockOperation struct {
 	sendFilesCalled int
 }
 
-func (o *MockOperation) SendFiles(fn SendFilesFunc) error {
+func (o *MockOperation) SendFiles(fn operations.SendFilesFunc) error {
 	o.sendFilesCalled++
 
 	for filename, contents := range o.filesToSend {
-		f := File{
+		f := operations.File{
 			Name: filename,
 			Body: strings.NewReader(contents),
 		}
@@ -134,10 +102,9 @@ func (o *MockOperation) SendFiles(fn SendFilesFunc) error {
 	return nil
 }
 
-type ErrorOperation struct {
-}
+type ErrorOperation struct{}
 
-func (o *ErrorOperation) SendFiles(fn SendFilesFunc) error {
+func (o *ErrorOperation) SendFiles(fn operations.SendFilesFunc) error {
 	return errors.New("error from ErrorOperation")
 }
 

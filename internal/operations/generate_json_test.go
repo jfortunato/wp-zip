@@ -1,4 +1,4 @@
-package builder
+package operations
 
 import (
 	"errors"
@@ -159,4 +159,49 @@ func assertError(t testing.TB, got, want error) {
 	if !errors.Is(got, want) {
 		t.Errorf("got %q, want %q", got, want)
 	}
+}
+
+func expectFilesSentFromOperation(t *testing.T, operation Operation, expectedFiles map[string]string) {
+	var filesSent []File
+
+	operation.SendFiles(func(file File) error {
+		filesSent = append(filesSent, file)
+		return nil
+	})
+
+	// Convert the expected files to a File slice
+	var expectedFilesSlice []File
+	for name, body := range expectedFiles {
+		expectedFilesSlice = append(expectedFilesSlice, File{Name: name, Body: strings.NewReader(body)})
+	}
+
+	expectFiles(t, filesSent, expectedFilesSlice)
+}
+
+func expectFiles(t *testing.T, files []File, expectedFiles []File) {
+	if len(files) != len(expectedFiles) {
+		t.Errorf("got %d files; want %d", len(files), len(expectedFiles))
+	}
+
+	for i, file := range files {
+		if file.Name != expectedFiles[i].Name {
+			t.Errorf("got file %d name %s; want %s", i, file.Name, expectedFiles[i].Name)
+		}
+
+		expectedBody := readerToString(expectedFiles[i].Body)
+		actualBody := readerToString(file.Body)
+
+		if actualBody != expectedBody {
+			t.Errorf("got file %d body %s; want %s", i, actualBody, expectedBody)
+		}
+	}
+}
+
+func readerToString(r io.Reader) string {
+	buf := new(strings.Builder)
+	_, err := io.Copy(buf, r)
+	if err != nil {
+		panic(err)
+	}
+	return buf.String()
 }

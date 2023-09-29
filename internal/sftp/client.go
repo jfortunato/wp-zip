@@ -16,13 +16,32 @@ type SSHCredentials struct {
 	Port string
 }
 
-// Client Our Client interface is a wrapper around the pkg/sftp Client
-// so that we can require it to implement only a subset of the
-// methods that we actually need.
-//type Client interface {
-//	ReadFileToString(path string) (string, error)
-//	Close() error
-//}
+// RemoteCommandRunner is an interface that allows us to check if the remote server can run a command, and then run it. An object may choose to use this interface instead of a full Client if it only needs to run commands.
+type RemoteCommandRunner interface {
+	CanRunRemoteCommand(command string) bool
+	RunRemoteCommand(command string) (io.Reader, error)
+}
+
+// FileUploadDeleter is an interface that allows us to upload, delete, and create directories on the remote server. An object may choose to use this interface instead of a full Client if it only needs to upload/delete files.
+type FileUploadDeleter interface {
+	Upload(r io.Reader, dst string) error
+	Delete(dst string) error
+	Mkdir(dst string) error
+}
+
+// FileEmitter is an interface that allows us to download files from the remote server. An object may choose to use this interface instead of a full Client if it only needs to download files.
+type RemoteFileReader interface {
+	ReadDir(path string) ([]os.FileInfo, error)
+	Open(path string) (*_sftp.File, error)
+	NewSession() (*ssh.Session, error)
+}
+
+// A Client is the full interface for interacting with the remote server. It combines the interfaces above.
+type Client interface {
+	RemoteCommandRunner
+	FileUploadDeleter
+	RemoteFileReader
+}
 
 // ClientWrapper Our ClientWrapper is a wrapper around the pkg/sftp Client
 // that only exposes the methods that we actually need.

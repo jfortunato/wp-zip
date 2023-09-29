@@ -1,8 +1,11 @@
-package builder
+package operations
 
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/jfortunato/wp-zip/internal/database"
+	"github.com/jfortunato/wp-zip/internal/sftp"
+	"github.com/jfortunato/wp-zip/internal/types"
 	"github.com/pkg/errors"
 	"io"
 	"math/rand"
@@ -11,15 +14,6 @@ import (
 	"time"
 )
 
-type GenerateJsonOperation struct {
-	u               FileUploadDeleter
-	g               HttpGetter
-	publicUrl       Domain
-	publicPath      PublicPath
-	credentials     DatabaseCredentials
-	randomFileNamer func() string
-}
-
 var (
 	ErrCouldNotUploadFile = errors.New("could not upload file")
 	ErrCouldNotDeleteFile = errors.New("error deleting file")
@@ -27,14 +21,21 @@ var (
 	ErrUnexpectedResponse = errors.New("unexpected response from server")
 )
 
-type FileUploadDeleter interface {
-	Upload(r io.Reader, dst string) error
-	Delete(dst string) error
-	Mkdir(dst string) error
-}
-
 type HttpGetter interface {
 	Get(url string) (resp io.ReadCloser, err error)
+}
+
+type GenerateJsonOperation struct {
+	u               sftp.FileUploadDeleter
+	g               HttpGetter
+	publicUrl       types.Domain
+	publicPath      types.PublicPath
+	credentials     database.DatabaseCredentials
+	randomFileNamer func() string
+}
+
+func NewGenerateJsonOperation(u sftp.FileUploadDeleter, g HttpGetter, publicUrl types.Domain, publicPath types.PublicPath, credentials database.DatabaseCredentials) *GenerateJsonOperation {
+	return &GenerateJsonOperation{u, g, publicUrl, publicPath, credentials, func() string { return "wp-zip-" + randSeq(10) + ".php" }}
 }
 
 func (o *GenerateJsonOperation) SendFiles(fn SendFilesFunc) (err error) {
@@ -113,7 +114,7 @@ func randSeq(n int) string {
 	return string(b)
 }
 
-func getPhpFileContents(credentials DatabaseCredentials, publicUrl Domain, publicPath PublicPath) string {
+func getPhpFileContents(credentials database.DatabaseCredentials, publicUrl types.Domain, publicPath types.PublicPath) string {
 	return fmt.Sprintf(`<?php
 
 // Connect to mysql and get the mysql version
