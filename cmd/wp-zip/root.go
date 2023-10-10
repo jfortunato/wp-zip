@@ -2,11 +2,14 @@ package wp_zip
 
 import (
 	"errors"
+	"fmt"
 	"github.com/jfortunato/wp-zip/internal/packager"
 	"github.com/jfortunato/wp-zip/internal/sftp"
 	"github.com/jfortunato/wp-zip/internal/types"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 	"log"
+	"syscall"
 )
 
 type VersionDetails struct {
@@ -27,14 +30,12 @@ func init() {
 	rootCmd.Flags().BoolP("help", "", false, "help for this command")
 	rootCmd.Flags().StringVarP(&Host, "host", "h", "", "SFTP host (required)")
 	rootCmd.Flags().StringVarP(&Username, "username", "u", "", "SFTP username (required)")
-	rootCmd.Flags().StringVarP(&Password, "password", "p", "", "SFTP password (required)")
+	rootCmd.Flags().StringVarP(&Password, "password", "p", "", "SFTP password (required or prompted)")
 	rootCmd.Flags().StringVarP(&Port, "port", "P", "22", "SFTP port")
 	rootCmd.Flags().StringVarP(&Domain, "domain", "d", "", "Domain name of the live site")
 	rootCmd.Flags().StringVarP(&Webroot, "webroot", "w", "", "Path to the public directory of the live site")
 	rootCmd.MarkFlagRequired("host")
 	rootCmd.MarkFlagRequired("username")
-	// TODO: Make this optional, and prompt for it if not provided
-	rootCmd.MarkFlagRequired("password")
 	rootCmd.MarkFlagRequired("domain")
 	rootCmd.MarkFlagRequired("webroot")
 
@@ -47,6 +48,13 @@ var rootCmd = &cobra.Command{
 	and database, which can be used to migrate the site
 	to another host or to create a local development environment.`,
 	Args: argsValidation(),
+	PreRun: func(cmd *cobra.Command, args []string) {
+		// If the user didn't provide a password, then prompt for it
+		// Run in a loop until the user provides a password
+		for Password == "" {
+			Password = promptForPassword()
+		}
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		p, err := packager.NewPackager(sftp.SSHCredentials{User: Username, Pass: Password, Host: Host, Port: Port}, types.Domain(Domain), types.PublicPath(Webroot))
 		if err != nil {
@@ -69,6 +77,16 @@ func argsValidation() cobra.PositionalArgs {
 
 		return nil
 	}
+}
+
+func promptForPassword() string {
+	fmt.Println("Enter sftp password: ")
+	password, err := terminal.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	return string(password)
 }
 
 func Execute(v VersionDetails) {
