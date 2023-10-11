@@ -114,7 +114,7 @@ func StartComposeContainers(t *testing.T, req ComposeRequest) map[string]*Contai
 	}
 
 	t.Cleanup(func() {
-		err = compose.Down(context.Background(), tc.RemoveOrphans(true), tc.RemoveImagesLocal)
+		err = compose.Down(context.Background(), tc.RemoveOrphans(true), tc.RemoveImagesAll, tc.RemoveVolumes(true))
 		if err != nil {
 			t.Errorf("Error stopping container: %s", err)
 		}
