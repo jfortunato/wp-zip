@@ -14,37 +14,35 @@ import (
 
 // Assign some constants for the container
 const (
-	PATH_TO_DOCKERFILE  = "./docker/openssh-test-server-noshell/Dockerfile"
-	SSH_HOST            = "127.0.0.1"
-	SSH_USER            = "test"
-	SSH_PASS            = "test"
-	MYSQL_ROOT_PASSWORD = "rootpass"
-	MYSQL_DATABASE      = "some_db_name"
-	DOCUMENT_ROOT       = "/html"
+	PATH_TO_COMPOSE_FILE = "./docker/openssh-test-server-noshell/docker-compose.yml"
+	SSH_HOST             = "127.0.0.1"
+	SSH_USER             = "test"
+	SSH_PASS             = "test"
+	DOCUMENT_ROOT        = "/html"
 )
 
 func TestZipFileCreated(t *testing.T) {
-	container := test.StartContainer(t, test.DefaultContainerRequest(filepath.Dir(PATH_TO_DOCKERFILE), MYSQL_ROOT_PASSWORD, MYSQL_DATABASE))
+	containers := test.StartComposeContainers(t, test.DefaultComposeRequest(PATH_TO_COMPOSE_FILE))
 
-	domain := types.Domain("localhost:" + container.MappedPort("80/tcp"))
+	domain := types.Domain("localhost:" + containers["wordpress"].MappedPort("80/tcp"))
 
 	filename := filepath.Join(os.TempDir(), "wp-zip-noshell.zip")
 	defer cleanup(t, filename)
 
-	p, _ := packager.NewPackager(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: container.MappedPort("22/tcp")}, domain, DOCUMENT_ROOT)
+	p, _ := packager.NewPackager(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: containers["wordpress"].MappedPort("22/tcp")}, domain, DOCUMENT_ROOT)
 	_ = p.PackageWP(filename)
 
 	test.AssertZipContainsFiles(t, filename, []string{"files/index.php", "files/wp-config.php", "database.sql", "wpmigrate-export.json"})
 }
 
 func TestUploadedFileIsAlwaysDeleted(t *testing.T) {
-	container := test.StartContainer(t, test.DefaultContainerRequest(filepath.Dir(PATH_TO_DOCKERFILE), MYSQL_ROOT_PASSWORD, MYSQL_DATABASE))
+	containers := test.StartComposeContainers(t, test.DefaultComposeRequest(PATH_TO_COMPOSE_FILE))
 
 	// When an invalid url is passed to the builder, it runs successfully up until it needs to generate the json file
 	// and send an http request.
 	invalidDomain := types.Domain("localhost:8888")
 
-	credentials := sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: container.MappedPort("22/tcp")}
+	credentials := sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: containers["wordpress"].MappedPort("22/tcp")}
 
 	filename := filepath.Join(os.TempDir(), "wp-zip-noshell-deleted.zip")
 	defer cleanup(t, filename)

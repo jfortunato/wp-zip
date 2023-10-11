@@ -1,0 +1,24 @@
+version: '3.1'
+
+services:
+
+  wordpress:
+    build:
+        context: .
+        dockerfile: Dockerfile
+    ports:
+      - "80/tcp"
+      - "22/tcp"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: exampleuser
+      WORDPRESS_DB_PASSWORD: examplepass
+      WORDPRESS_DB_NAME: some_db_name
+
+  db:
+    image: mysql:8.0-debian
+    environment:
+      MYSQL_DATABASE: some_db_name
+      MYSQL_USER: exampleuser
+      MYSQL_PASSWORD: examplepass
+      MYSQL_RANDOM_ROOT_PASSWORD: '1'

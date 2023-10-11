@@ -1,6 +1,6 @@
-FROM mysql:8.0-debian
+FROM wordpress
 
-RUN apt update && apt install openssh-server libapache2-mod-php7.4 php7.4-mysql -y
+RUN apt update && apt install openssh-server -y
 
 RUN useradd -rm -d /home/test -s /bin/bash test
 RUN echo 'test:test' | chpasswd
@@ -10,8 +10,6 @@ RUN chown root:root /var/www
 RUN chmod 755 /var/www
 # The public directory is owned by the user
 RUN chown -R test:www-data /var/www/html
-RUN rm /var/www/html/index.html
-COPY public /var/www/html
 
 # Edit the sshd_config file to restrict access to one directory & disable shell access
 RUN echo "Match User test" >> /etc/ssh/sshd_config
@@ -27,6 +25,5 @@ COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
 EXPOSE 22
-EXPOSE 80
 
 CMD ["/start.sh"]
