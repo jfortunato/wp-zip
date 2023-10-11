@@ -24,7 +24,7 @@ jobs:
       - name: Unit tests
         run: go test ./...
 
-  build-and-integration-test:
+  build-and-acceptance-test:
     runs-on: ubuntu-latest
     services:
       dind:
@@ -42,5 +42,5 @@ jobs:
       - name: Install dependencies
         run: go get -v -t -d ./...
 
-      - name: Integration tests
-        run: go test -tags=integration ./...
+      - name: Acceptance tests
+        run: go test -tags=acceptance ./...
