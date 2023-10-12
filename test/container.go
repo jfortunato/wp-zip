@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"github.com/docker/go-connections/nat"
+	"github.com/jfortunato/wp-zip/internal/types"
 	"github.com/testcontainers/testcontainers-go"
 	tc "github.com/testcontainers/testcontainers-go/modules/compose"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -77,6 +78,16 @@ func DefaultComposeRequest(pathToComposeFile string) ComposeRequest {
 				},
 			},
 		},
+	}
+}
+
+// InstallWP uses wp-cli to install wordpress in the running container. It is a helper function that most tests will need to use in order to
+// get a working wordpress installation.
+func InstallWP(t *testing.T, c *Container, siteUrl types.Domain) {
+	t.Helper()
+	code, _, err := c.c.Exec(c.ctx, []string{"wp", "core", "install", "--url=" + string(siteUrl), "--title=Test", "--admin_user=admin", "--admin_password=admin", "--admin_email=foo@example.com", "--allow-root"})
+	if code != 0 || err != nil {
+		t.Errorf("Error installing wordpress: %s", err)
 	}
 }
 

@@ -26,6 +26,8 @@ func TestZipFileCreated(t *testing.T) {
 
 	domain := types.Domain("localhost:" + containers["wordpress"].MappedPort("80/tcp"))
 
+	test.InstallWP(t, containers["wordpress"], domain)
+
 	filename := filepath.Join(os.TempDir(), "wp-zip-basic.zip")
 	defer cleanup(t, filename)
 
@@ -41,6 +43,8 @@ func TestUploadedFileIsAlwaysDeleted(t *testing.T) {
 	// When an invalid url is passed to the builder, it runs successfully up until it needs to generate the json file
 	// and send an http request.
 	invalidDomain := types.Domain("localhost:8888")
+
+	test.InstallWP(t, containers["wordpress"], invalidDomain)
 
 	credentials := sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: containers["wordpress"].MappedPort("22/tcp")}
 

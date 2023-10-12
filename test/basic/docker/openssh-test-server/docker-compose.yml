@@ -14,8 +14,6 @@ services:
       WORDPRESS_DB_USER: exampleuser
       WORDPRESS_DB_PASSWORD: examplepass
       WORDPRESS_DB_NAME: some_db_name
-    volumes:
-      - wordpress:/var/www/html
 
   db:
     image: mysql:8.0-debian
@@ -24,9 +22,3 @@ services:
       MYSQL_USER: exampleuser
       MYSQL_PASSWORD: examplepass
       MYSQL_RANDOM_ROOT_PASSWORD: '1'
-    volumes:
-      - db:/var/lib/mysql
-
-volumes:
-  wordpress:
-  db:
