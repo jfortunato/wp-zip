@@ -1,8 +1,6 @@
 package packager
 
 import (
-	"errors"
-	"github.com/jfortunato/wp-zip/internal/database"
 	"github.com/jfortunato/wp-zip/internal/emitter"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
@@ -15,7 +13,7 @@ func TestBuilder_Build(t *testing.T) {
 	t.Run("it should build the operations", func(t *testing.T) {
 		builder := createBuilderWithStubs()
 
-		ops, err := builder.Build(Options{})
+		ops, err := builder.Build(SiteInfo{})
 
 		if err != nil {
 			t.Errorf("got error %v; want nil", err)
@@ -26,18 +24,6 @@ func TestBuilder_Build(t *testing.T) {
 			t.Errorf("got 0 operations; want > 0")
 		}
 	})
-
-	t.Run("it should return an error if the credentials parser fails", func(t *testing.T) {
-		builder := createBuilderWithStubs()
-		builder.p = &CredentialsParserStub{errorStub: errors.New("error")}
-
-		_, err := builder.Build(Options{})
-
-		// Assert that we got the error we expect
-		if !errors.Is(err, ErrCannotParseCredentials) {
-			t.Errorf("got error %v; want ErrCannotParseCredentials", err)
-		}
-	})
 }
 
 func createBuilderWithStubs() *Builder {
@@ -45,16 +31,7 @@ func createBuilderWithStubs() *Builder {
 		c: &ClientStub{},
 		e: &FileEmitterStub{},
 		g: &HttpGetterStub{},
-		p: &CredentialsParserStub{},
 	}
-}
-
-type CredentialsParserStub struct {
-	errorStub error
-}
-
-func (p *CredentialsParserStub) ParseDatabaseCredentials() (database.DatabaseCredentials, error) {
-	return database.DatabaseCredentials{}, p.errorStub
 }
 
 type ClientStub struct{}
