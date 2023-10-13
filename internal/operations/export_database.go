@@ -11,8 +11,8 @@ type ExportDatabaseOperation struct {
 	exporter database.DatabaseExporter
 }
 
-func NewExportDatabaseOperation(credentials database.DatabaseCredentials, c sftp.Client, pathToPublic types.PublicPath, domain types.Domain, g HttpGetter, e emitter.FileEmitter) *ExportDatabaseOperation {
-	exporter := database.NewDatabaseExporter(c, pathToPublic, domain, g, e, credentials)
+func NewExportDatabaseOperation(credentials database.DatabaseCredentials, c sftp.Client, pathToPublic types.PublicPath, siteUrl types.SiteUrl, g HttpGetter, e emitter.FileEmitter) *ExportDatabaseOperation {
+	exporter := database.NewDatabaseExporter(c, pathToPublic, siteUrl, g, e, credentials)
 
 	return &ExportDatabaseOperation{exporter}
 }

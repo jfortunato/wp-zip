@@ -24,14 +24,14 @@ const (
 func TestZipFileCreated(t *testing.T) {
 	containers := test.StartComposeContainers(t, test.DefaultComposeRequest(PATH_TO_COMPOSE_FILE))
 
-	domain := types.Domain("localhost:" + containers["wordpress"].MappedPort("80/tcp"))
+	url, _ := types.NewSiteUrl("http://localhost:" + containers["wordpress"].MappedPort("80/tcp"))
 
-	test.InstallWP(t, containers["wordpress"], domain)
+	test.InstallWP(t, containers["wordpress"], url)
 
 	filename := filepath.Join(os.TempDir(), "wp-zip-noshell.zip")
 	defer cleanup(t, filename)
 
-	p, _ := packager.NewPackager(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: containers["wordpress"].MappedPort("22/tcp")}, domain, DOCUMENT_ROOT)
+	p, _ := packager.NewPackager(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: containers["wordpress"].MappedPort("22/tcp")}, url, DOCUMENT_ROOT)
 	_ = p.PackageWP(filename)
 
 	test.AssertZipContainsFiles(t, filename, []string{"files/index.php", "files/wp-config.php", "database.sql", "wpmigrate-export.json"})
@@ -42,7 +42,7 @@ func TestUploadedFileIsAlwaysDeleted(t *testing.T) {
 
 	// When an invalid url is passed to the builder, it runs successfully up until it needs to generate the json file
 	// and send an http request.
-	invalidDomain := types.Domain("localhost:8888")
+	invalidDomain := types.SiteUrl("localhost:8888")
 
 	test.InstallWP(t, containers["wordpress"], invalidDomain)
 

@@ -28,14 +28,14 @@ type HttpGetter interface {
 type GenerateJsonOperation struct {
 	u               sftp.FileUploadDeleter
 	g               HttpGetter
-	publicUrl       types.Domain
+	siteUrl         types.SiteUrl
 	publicPath      types.PublicPath
 	credentials     database.DatabaseCredentials
 	randomFileNamer func() string
 }
 
-func NewGenerateJsonOperation(u sftp.FileUploadDeleter, g HttpGetter, publicUrl types.Domain, publicPath types.PublicPath, credentials database.DatabaseCredentials) *GenerateJsonOperation {
-	return &GenerateJsonOperation{u, g, publicUrl, publicPath, credentials, func() string { return "wp-zip-" + randSeq(10) + ".php" }}
+func NewGenerateJsonOperation(u sftp.FileUploadDeleter, g HttpGetter, siteUrl types.SiteUrl, publicPath types.PublicPath, credentials database.DatabaseCredentials) *GenerateJsonOperation {
+	return &GenerateJsonOperation{u, g, siteUrl, publicPath, credentials, func() string { return "wp-zip-" + randSeq(10) + ".php" }}
 }
 
 func (o *GenerateJsonOperation) SendFiles(fn SendFilesFunc) (err error) {
@@ -49,7 +49,7 @@ func (o *GenerateJsonOperation) SendFiles(fn SendFilesFunc) (err error) {
 	// Generate a random filename
 	basename := o.randomFileNamer()
 	uploadFilename := string(o.publicPath) + "/" + basename
-	err = o.u.Upload(strings.NewReader(getPhpFileContents(o.credentials, o.publicUrl, o.publicPath)), uploadFilename)
+	err = o.u.Upload(strings.NewReader(getPhpFileContents(o.credentials, o.siteUrl, o.publicPath)), uploadFilename)
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrCouldNotUploadFile, err)
 	}
@@ -63,13 +63,9 @@ func (o *GenerateJsonOperation) SendFiles(fn SendFilesFunc) (err error) {
 	}()
 
 	// 2.
-	resp, err := o.g.Get(o.publicUrl.AsSecureUrl() + "/" + basename)
+	resp, err := o.g.Get(string(o.siteUrl) + "/" + basename)
 	if err != nil {
-		// Try an insecure URL before returning an error
-		resp, err = o.g.Get(o.publicUrl.AsInsecureUrl() + "/" + basename)
-		if err != nil {
-			return fmt.Errorf("%w: %s", ErrInvalidResponse, err)
-		}
+		return fmt.Errorf("%w: %s", ErrInvalidResponse, err)
 	}
 	defer resp.Close()
 	// Read the response body to a string
@@ -114,7 +110,7 @@ func randSeq(n int) string {
 	return string(b)
 }
 
-func getPhpFileContents(credentials database.DatabaseCredentials, publicUrl types.Domain, publicPath types.PublicPath) string {
+func getPhpFileContents(credentials database.DatabaseCredentials, siteUrl types.SiteUrl, publicPath types.PublicPath) string {
 	return fmt.Sprintf(`<?php
 
 // Connect to mysql and get the mysql version
@@ -148,7 +144,7 @@ echo json_encode(array_merge_recursive([
         ],
     ],
 ], ['services' => $serverJson]));
-`, credentials.User, credentials.Pass, credentials.Name, publicUrl, publicUrl, publicPath)
+`, credentials.User, credentials.Pass, credentials.Name, siteUrl.Domain(), siteUrl.Domain(), publicPath)
 }
 
 type BasicHttpGetter struct{}

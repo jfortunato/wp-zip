@@ -7,40 +7,27 @@ import (
 )
 
 // SiteUrl represents a URL to a WordPress site. We use this type to consistently ensure that the URL is valid.
-type SiteUrl struct {
-	protocol string
-	domain   string
-}
+type SiteUrl string
 
 // NewSiteUrl is a constructor that returns a SiteUrl. It returns an error if the URL is invalid.
 func NewSiteUrl(input string) (SiteUrl, error) {
 	r, err := url.Parse(input)
 	if err != nil {
-		return SiteUrl{}, err
+		return "", err
 	}
 
 	if r.Scheme == "" || r.Host == "" {
-		return SiteUrl{}, fmt.Errorf("invalid url")
+		return "", fmt.Errorf("invalid url")
 	}
 
-	return SiteUrl{r.Scheme, r.Host}, nil
+	return SiteUrl(fmt.Sprintf("%s://%s", r.Scheme, r.Host)), nil
 }
 
-// Intended as a stopgap until we can refactor the code to use SiteUrl instead of Domain
-func (s *SiteUrl) AsDomain() Domain {
-	return Domain(s.domain)
-}
-
-// Domain represents a domain name/host. We can use the AsSecureUrl and AsInsecureUrl methods
-// to get the domain as a URL with the appropriate protocol.
-type Domain string
-
-func (d Domain) AsSecureUrl() string {
-	return fmt.Sprintf("https://%s", d)
-}
-
-func (d Domain) AsInsecureUrl() string {
-	return fmt.Sprintf("http://%s", d)
+// Domain returns the domain of the SiteUrl without the protocol. For example, if the SiteUrl is https://example.com, this method will return example.com.
+func (u SiteUrl) Domain() string {
+	// Remove the protocol
+	s := strings.TrimPrefix(string(u), "https://")
+	return strings.TrimPrefix(s, "http://")
 }
 
 // PublicPath represents the path to the public directory of a WordPress site. We use this

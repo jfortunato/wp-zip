@@ -19,8 +19,17 @@ var Host string
 var Username string
 var Password string
 var Port string
-var Domain string
+var SiteUrl string
 var Webroot string
+
+// RunOptions are the pre-run validated options that are passed to the Run function
+type RunOptions struct {
+	sshCredentials sftp.SSHCredentials
+	siteUrl        types.SiteUrl
+	publicPath     types.PublicPath
+}
+
+var Options RunOptions
 
 func init() {
 	// Override the help command to disable the shorthand -h, as it is used for the --host instead
@@ -29,7 +38,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&Username, "username", "u", "", "SFTP username (required)")
 	rootCmd.Flags().StringVarP(&Password, "password", "p", "", "SFTP password (required or prompted)")
 	rootCmd.Flags().StringVarP(&Port, "port", "P", "22", "SFTP port")
-	rootCmd.Flags().StringVarP(&Domain, "domain", "d", "", "Domain name of the live site")
+	rootCmd.Flags().StringVarP(&SiteUrl, "site-url", "", "", "Site url name of the live site, including the protocol (e.g. https://example.com)")
 	rootCmd.Flags().StringVarP(&Webroot, "webroot", "w", "", "Path to the public directory of the live site")
 	rootCmd.MarkFlagRequired("host")
 	rootCmd.MarkFlagRequired("username")
@@ -38,22 +47,40 @@ func init() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "wp-zip -h sftp-host -u sftp-username -p sftp-password -d example.com -w path-to-webroot [flags] output-filename",
+	Use:   "wp-zip -h sftp-host -u sftp-username -p sftp-password -w path-to-webroot [flags] output-filename",
 	Short: "Export an existing WordPress site to a zip file",
 	Long: `Generate a complete archive of a WordPress site's files
 	and database, which can be used to migrate the site
 	to another host or to create a local development environment.`,
 	Args: argsValidation(),
 	PreRun: func(cmd *cobra.Command, args []string) {
+		var err error
+
 		// If the user didn't provide a password, then prompt for it
 		// Run in a loop until the user provides a password
 		for Password == "" {
 			prompter := &packager.RuntimePrompter{}
 			Password = prompter.PromptForPassword("Enter SFTP password: ")
 		}
+
+		// If the user supplied a site url, make sure it is valid
+		var siteUrl types.SiteUrl
+		if SiteUrl != "" {
+			siteUrl, err = types.NewSiteUrl(SiteUrl)
+			if err != nil {
+				log.Fatalln(err)
+			}
+		}
+
+		// Construct all the RunOptions
+		Options = RunOptions{
+			sftp.SSHCredentials{User: Username, Pass: Password, Host: Host, Port: Port},
+			siteUrl,
+			types.PublicPath(Webroot),
+		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		p, err := packager.NewPackager(sftp.SSHCredentials{User: Username, Pass: Password, Host: Host, Port: Port}, types.Domain(Domain), types.PublicPath(Webroot))
+		p, err := packager.NewPackager(Options.sshCredentials, Options.siteUrl, Options.publicPath)
 		if err != nil {
 			log.Fatalln(err)
 		}

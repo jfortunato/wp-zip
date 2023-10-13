@@ -17,7 +17,7 @@ var ErrCannotParseCredentials = errors.New("error parsing database credentials")
 
 // SiteInfo contains all the information needed to package a WordPress site.
 type SiteInfo struct {
-	siteUrl       types.Domain
+	siteUrl       types.SiteUrl
 	publicPath    types.PublicPath
 	dbCredentials database.DatabaseCredentials
 }
@@ -27,7 +27,7 @@ type CredentialsParser interface {
 }
 
 // DetermineSiteInfo determines the site info needed to package a WordPress site. Some of the information is determined at runtime, such as the database credentials.
-func DetermineSiteInfo(siteUrl types.Domain, publicPath types.PublicPath, parser CredentialsParser, runner sftp.RemoteCommandRunner, prompter Prompter) (SiteInfo, error) {
+func DetermineSiteInfo(siteUrl types.SiteUrl, publicPath types.PublicPath, parser CredentialsParser, runner sftp.RemoteCommandRunner, prompter Prompter) (SiteInfo, error) {
 	// We need to determine the database credentials at runtime
 	credentials, err := parser.ParseDatabaseCredentials()
 	if err != nil {
@@ -54,10 +54,10 @@ func DetermineSiteInfo(siteUrl types.Domain, publicPath types.PublicPath, parser
 	}, nil
 }
 
-func determineSiteUrl(credentials database.DatabaseCredentials, runner sftp.RemoteCommandRunner, prompter Prompter) (types.Domain, error) {
+func determineSiteUrl(credentials database.DatabaseCredentials, runner sftp.RemoteCommandRunner, prompter Prompter) (types.SiteUrl, error) {
 	cmd := fmt.Sprintf(`mysql %s --skip-column-names --silent -e "%s"`, database.MysqlCliCredentials(credentials), SELECT_SITE_URL_STMT)
 
-	var siteUrl types.Domain
+	var siteUrl types.SiteUrl
 
 	// First we'll try to automatically get the siteurl from the database.
 	if runner.CanRunRemoteCommand(cmd) {
@@ -66,13 +66,17 @@ func determineSiteUrl(credentials database.DatabaseCredentials, runner sftp.Remo
 
 	// If we don't have a siteUrl at this point, we need to prompt for it
 	if siteUrl == "" {
-		siteUrl = promptForSiteUrl(prompter)
+		var err error
+		siteUrl, err = promptForSiteUrl(prompter)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	return siteUrl, nil
 }
 
-func queryForSiteUrl(runner sftp.RemoteCommandRunner, cmd string) types.Domain {
+func queryForSiteUrl(runner sftp.RemoteCommandRunner, cmd string) types.SiteUrl {
 	output, err := runner.RunRemoteCommand(cmd)
 	if err != nil {
 		return ""
@@ -81,10 +85,14 @@ func queryForSiteUrl(runner sftp.RemoteCommandRunner, cmd string) types.Domain {
 	b, _ := io.ReadAll(output)
 	str := strings.TrimSpace(string(b))
 	u, _ := types.NewSiteUrl(str)
-	return u.AsDomain()
+	return u
 }
 
-func promptForSiteUrl(prompter Prompter) types.Domain {
+func promptForSiteUrl(prompter Prompter) (types.SiteUrl, error) {
 	response := prompter.Prompt("What is the site url?")
-	return types.Domain(response)
+	u, err := types.NewSiteUrl(response)
+	if err != nil {
+		return "", err
+	}
+	return u, nil
 }

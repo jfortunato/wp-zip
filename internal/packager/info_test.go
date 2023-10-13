@@ -42,7 +42,7 @@ func TestDetermineSiteInfo(t *testing.T) {
 			name        string
 			stubbedCmds map[string]string
 			promptCalls int
-			wantSiteUrl types.Domain
+			wantSiteUrl types.SiteUrl
 		}{
 			{
 				"via database select",
@@ -50,13 +50,13 @@ func TestDetermineSiteInfo(t *testing.T) {
 					cmd: "https://example.com/\n",
 				},
 				0,
-				"example.com",
+				"https://example.com",
 			},
 			{
 				"via prompter if cmd cannot be run",
 				map[string]string{},
 				1,
-				"prompted-localhost",
+				"http://prompted-localhost",
 			},
 			{
 				"via prompter if cmd can be run but returns empty string",
@@ -64,7 +64,7 @@ func TestDetermineSiteInfo(t *testing.T) {
 					cmd: "",
 				},
 				1,
-				"prompted-localhost",
+				"http://prompted-localhost",
 			},
 			{
 				"via prompter if cmd can be run but returns invalid url",
@@ -72,7 +72,7 @@ func TestDetermineSiteInfo(t *testing.T) {
 					cmd: "invalid-url",
 				},
 				1,
-				"prompted-localhost",
+				"http://prompted-localhost",
 			},
 		}
 
@@ -114,7 +114,7 @@ type PrompterSpy struct {
 
 func (p *PrompterSpy) Prompt(question string) string {
 	p.calls++
-	return "prompted-localhost"
+	return "http://prompted-localhost"
 }
 
 type MockCommandRunner struct {

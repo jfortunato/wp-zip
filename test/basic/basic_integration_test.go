@@ -24,17 +24,18 @@ const (
 func TestZipFileCreated(t *testing.T) {
 	containers := test.StartComposeContainers(t, test.DefaultComposeRequest(PATH_TO_COMPOSE_FILE))
 
-	domain := types.Domain("localhost:" + containers["wordpress"].MappedPort("80/tcp"))
+	url, _ := types.NewSiteUrl("http://localhost:" + containers["wordpress"].MappedPort("80/tcp"))
 
-	test.InstallWP(t, containers["wordpress"], domain)
+	test.InstallWP(t, containers["wordpress"], url)
 
 	filename := filepath.Join(os.TempDir(), "wp-zip-basic.zip")
 	defer cleanup(t, filename)
 
-	p, _ := packager.NewPackager(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: containers["wordpress"].MappedPort("22/tcp")}, domain, DOCUMENT_ROOT)
+	p, _ := packager.NewPackager(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: containers["wordpress"].MappedPort("22/tcp")}, url, DOCUMENT_ROOT)
 	_ = p.PackageWP(filename)
 
 	test.AssertZipContainsFiles(t, filename, []string{"files/index.php", "files/wp-config.php", "database.sql", "wpmigrate-export.json"})
+	test.AssertFileContainsMatch(t, filename, "wpmigrate-export.json", `"name":"`+url.Domain()+`"`)
 }
 
 func TestUploadedFileIsAlwaysDeleted(t *testing.T) {
@@ -42,7 +43,7 @@ func TestUploadedFileIsAlwaysDeleted(t *testing.T) {
 
 	// When an invalid url is passed to the builder, it runs successfully up until it needs to generate the json file
 	// and send an http request.
-	invalidDomain := types.Domain("localhost:8888")
+	invalidDomain := types.SiteUrl("http://localhost:8888")
 
 	test.InstallWP(t, containers["wordpress"], invalidDomain)
 
@@ -64,9 +65,9 @@ func TestUploadedFileIsAlwaysDeleted(t *testing.T) {
 func TestDomainCanBeInferredFromDatabase(t *testing.T) {
 	containers := test.StartComposeContainers(t, test.DefaultComposeRequest(PATH_TO_COMPOSE_FILE))
 
-	expectedDomain := types.Domain("localhost:" + containers["wordpress"].MappedPort("80/tcp"))
+	expectedUrl, _ := types.NewSiteUrl("http://localhost:" + containers["wordpress"].MappedPort("80/tcp"))
 
-	test.InstallWP(t, containers["wordpress"], expectedDomain)
+	test.InstallWP(t, containers["wordpress"], expectedUrl)
 
 	filename := filepath.Join(os.TempDir(), "wp-zip-basic-detect-domain.zip")
 	defer cleanup(t, filename)
@@ -75,7 +76,7 @@ func TestDomainCanBeInferredFromDatabase(t *testing.T) {
 	_ = p.PackageWP(filename)
 
 	test.AssertZipContainsFiles(t, filename, []string{"files/index.php", "files/wp-config.php", "database.sql", "wpmigrate-export.json"})
-	test.AssertFileContainsMatch(t, filename, "wpmigrate-export.json", `"domain":"`+string(expectedDomain)+`"`)
+	test.AssertFileContainsMatch(t, filename, "wpmigrate-export.json", `"domain":"`+expectedUrl.Domain()+`"`)
 }
 
 func cleanup(t *testing.T, zipFilename string) {

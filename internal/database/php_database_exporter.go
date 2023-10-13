@@ -23,7 +23,7 @@ const MYSQLDUMP_PHP_VERSION = "2.11"
 type PHPDatabaseExporter struct {
 	u           sftp.FileUploadDeleter
 	p           types.PublicPath
-	publicUrl   types.Domain
+	siteUrl     types.SiteUrl
 	g           HttpGetter
 	e           emitter.FileEmitter
 	credentials DatabaseCredentials
@@ -57,13 +57,9 @@ func (e *PHPDatabaseExporter) Export() (io.Reader, error) {
 	}
 
 	// Finally, run the script on the remote host by making an HTTP request to it
-	resp, err := e.g.Get(e.publicUrl.AsSecureUrl() + "/wp-zip-database-export/dump.php")
+	resp, err := e.g.Get(string(e.siteUrl) + "/wp-zip-database-export/dump.php")
 	if err != nil {
-		// Try an insecure URL before returning an error
-		resp, err = e.g.Get(e.publicUrl.AsInsecureUrl() + "/wp-zip-database-export/dump.php")
-		if err != nil {
-			return nil, fmt.Errorf("%w: %s", errors.New("invalid response from server"), err)
-		}
+		return nil, fmt.Errorf("%w: %s", errors.New("invalid response from server"), err)
 	}
 	defer resp.Close()
 

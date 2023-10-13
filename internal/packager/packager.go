@@ -38,7 +38,7 @@ type Packager struct {
 }
 
 // NewPackager is the constructor for Packager. It will create the default implementations of OperationsBuilder and OperationsRunner.
-func NewPackager(sshCredentials sftp.SSHCredentials, publicUrl types.Domain, publicPath types.PublicPath) (*Packager, error) {
+func NewPackager(sshCredentials sftp.SSHCredentials, siteUrl types.SiteUrl, publicPath types.PublicPath) (*Packager, error) {
 	client, err := sftp.NewClient(sshCredentials)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrCannotCreateClient, err)
@@ -46,7 +46,7 @@ func NewPackager(sshCredentials sftp.SSHCredentials, publicUrl types.Domain, pub
 
 	e := emitter.NewFileEmitter(client)
 
-	info, err := DetermineSiteInfo(publicUrl, publicPath, database.NewEmitterCredentialsParser(e, publicPath), client, &RuntimePrompter{})
+	info, err := DetermineSiteInfo(siteUrl, publicPath, database.NewEmitterCredentialsParser(e, publicPath), client, &RuntimePrompter{})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrCannotDetermineSiteInfo, err)
 	}

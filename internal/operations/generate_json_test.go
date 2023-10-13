@@ -44,26 +44,6 @@ func TestGenerateJsonOperation(t *testing.T) {
 		assertError(t, err, ErrInvalidResponse)
 	})
 
-	t.Run("it attempts an insecure url (http) after an unsuccessful secure url (https)", func(t *testing.T) {
-		operation := newOperation()
-		operation.g = &MockHttpGetter{
-			responseStubs: map[string]GetterResponse{
-				"https://localhost/wp-zip.php": {
-					resp: nil,
-					err:  errors.New("error response"),
-				},
-				"http://localhost/wp-zip.php": {
-					resp: io.NopCloser(strings.NewReader(`{"name":"Migrated Site"}`)),
-					err:  nil,
-				},
-			},
-		}
-
-		expectFilesSentFromOperation(t, operation, map[string]string{
-			"wpmigrate-export.json": `{"name":"Migrated Site"}`,
-		})
-	})
-
 	t.Run("it returns an error if the http response is not what we expect", func(t *testing.T) {
 		operation := newOperation()
 		// No error, but the response is not what we expect
@@ -108,7 +88,7 @@ func newOperation() *GenerateJsonOperation {
 				},
 			},
 		},
-		publicUrl:  "localhost",
+		siteUrl:    "https://localhost",
 		publicPath: "public",
 		randomFileNamer: func() string {
 			return "wp-zip.php"

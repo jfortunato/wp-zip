@@ -23,10 +23,10 @@ type DatabaseExporter interface {
 }
 
 // NewDatabaseExporter is a factory function that returns a DatabaseExporter. It detects at runtime whether the remote server supports `mysqldump` or not, and returns the appropriate exporter.
-func NewDatabaseExporter(c sftp.Client, p types.PublicPath, d types.Domain, g HttpGetter, e emitter.FileEmitter, creds DatabaseCredentials) DatabaseExporter {
+func NewDatabaseExporter(c sftp.Client, p types.PublicPath, u types.SiteUrl, g HttpGetter, e emitter.FileEmitter, creds DatabaseCredentials) DatabaseExporter {
 	if c.CanRunRemoteCommand("mysqldump --version") {
 		return &MysqldumpDatabaseExporter{c, creds}
 	}
 
-	return &PHPDatabaseExporter{c, p, d, g, e, creds}
+	return &PHPDatabaseExporter{c, p, u, g, e, creds}
 }

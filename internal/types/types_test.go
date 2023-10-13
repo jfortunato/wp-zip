@@ -9,9 +9,9 @@ func TestSiteUrl(t *testing.T) {
 			input    string
 			expected SiteUrl
 		}{
-			{"full https url", "https://example.com", SiteUrl{"https", "example.com"}},
-			{"full http url", "http://example.com", SiteUrl{"http", "example.com"}},
-			{"full url trailing slash", "https://example.com/", SiteUrl{"https", "example.com"}},
+			{"full https url", "https://example.com", "https://example.com"},
+			{"full http url", "http://example.com", "http://example.com"},
+			{"full url trailing slash", "https://example.com/", "https://example.com"},
 		}
 
 		for _, test := range tests {
@@ -44,6 +44,31 @@ func TestSiteUrl(t *testing.T) {
 
 				if err == nil {
 					t.Errorf("got nil; want error")
+				}
+			})
+		}
+	})
+
+	t.Run("its Domain method should remove the protocol", func(t *testing.T) {
+		var tests = []struct {
+			name     string
+			input    string
+			expected string
+		}{
+			{"https", "https://example.com", "example.com"},
+			{"http", "http://example.com", "example.com"},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				url, err := NewSiteUrl(test.input)
+
+				if err != nil {
+					t.Errorf("got error %v; want nil", err)
+				}
+
+				if url.Domain() != test.expected {
+					t.Errorf("got %s; want %s", url.Domain(), test.expected)
 				}
 			})
 		}
