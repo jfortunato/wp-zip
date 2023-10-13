@@ -61,6 +61,23 @@ func TestUploadedFileIsAlwaysDeleted(t *testing.T) {
 	test.AssertRemoteFileDoesNotExist(t, credentials, DOCUMENT_ROOT, `wp-zip-[^.]+\.php`)
 }
 
+func TestDomainCanBeInferredFromDatabase(t *testing.T) {
+	containers := test.StartComposeContainers(t, test.DefaultComposeRequest(PATH_TO_COMPOSE_FILE))
+
+	expectedDomain := types.Domain("localhost:" + containers["wordpress"].MappedPort("80/tcp"))
+
+	test.InstallWP(t, containers["wordpress"], expectedDomain)
+
+	filename := filepath.Join(os.TempDir(), "wp-zip-basic-detect-domain.zip")
+	defer cleanup(t, filename)
+
+	p, _ := packager.NewPackager(sftp.SSHCredentials{User: SSH_USER, Pass: SSH_PASS, Host: SSH_HOST, Port: containers["wordpress"].MappedPort("22/tcp")}, "", DOCUMENT_ROOT)
+	_ = p.PackageWP(filename)
+
+	test.AssertZipContainsFiles(t, filename, []string{"files/index.php", "files/wp-config.php", "database.sql", "wpmigrate-export.json"})
+	test.AssertFileContainsMatch(t, filename, "wpmigrate-export.json", `"domain":"`+string(expectedDomain)+`"`)
+}
+
 func cleanup(t *testing.T, zipFilename string) {
 	t.Helper()
 

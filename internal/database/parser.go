@@ -61,7 +61,7 @@ func (p *EmitterCredentialsParser) fetchWPConfigContents() (string, error) {
 
 // parseDatabaseCredentials parses the database credentials from the wp-config.php file.
 func parseDatabaseCredentials(contents string) (DatabaseCredentials, error) {
-	var fields = map[string]string{"DB_USER": "", "DB_PASSWORD": "", "DB_NAME": ""}
+	var fields = map[string]string{"DB_USER": "", "DB_PASSWORD": "", "DB_NAME": "", "DB_HOST": ""}
 
 	for field, _ := range fields {
 		value, err := parseWpConfigField(contents, field)
@@ -71,7 +71,7 @@ func parseDatabaseCredentials(contents string) (DatabaseCredentials, error) {
 		fields[field] = value
 	}
 
-	return DatabaseCredentials{User: fields["DB_USER"], Pass: fields["DB_PASSWORD"], Name: fields["DB_NAME"]}, nil
+	return DatabaseCredentials{User: fields["DB_USER"], Pass: fields["DB_PASSWORD"], Name: fields["DB_NAME"], Host: fields["DB_HOST"]}, nil
 }
 
 // parseWpConfigField parses a single field from the wp-config.php file.

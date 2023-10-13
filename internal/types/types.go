@@ -2,8 +2,34 @@ package types
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 )
+
+// SiteUrl represents a URL to a WordPress site. We use this type to consistently ensure that the URL is valid.
+type SiteUrl struct {
+	protocol string
+	domain   string
+}
+
+// NewSiteUrl is a constructor that returns a SiteUrl. It returns an error if the URL is invalid.
+func NewSiteUrl(input string) (SiteUrl, error) {
+	r, err := url.Parse(input)
+	if err != nil {
+		return SiteUrl{}, err
+	}
+
+	if r.Scheme == "" || r.Host == "" {
+		return SiteUrl{}, fmt.Errorf("invalid url")
+	}
+
+	return SiteUrl{r.Scheme, r.Host}, nil
+}
+
+// Intended as a stopgap until we can refactor the code to use SiteUrl instead of Domain
+func (s *SiteUrl) AsDomain() Domain {
+	return Domain(s.domain)
+}
 
 // Domain represents a domain name/host. We can use the AsSecureUrl and AsInsecureUrl methods
 // to get the domain as a URL with the appropriate protocol.

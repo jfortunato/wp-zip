@@ -46,7 +46,7 @@ func NewPackager(sshCredentials sftp.SSHCredentials, publicUrl types.Domain, pub
 
 	e := emitter.NewFileEmitter(client)
 
-	info, err := DetermineSiteInfo(publicUrl, publicPath, database.NewEmitterCredentialsParser(e, publicPath))
+	info, err := DetermineSiteInfo(publicUrl, publicPath, database.NewEmitterCredentialsParser(e, publicPath), client, &RuntimePrompter{})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrCannotDetermineSiteInfo, err)
 	}

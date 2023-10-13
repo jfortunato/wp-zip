@@ -14,6 +14,7 @@ func TestParser(t *testing.T) {
 define('DB_NAME', 'name');
 define('DB_USER', 'user');
 define('DB_PASSWORD', 'pass');
+define('DB_HOST', 'localhost');
 `
 
 		parser := NewEmitterCredentialsParser(&EmitterStub{contentsToEmit: contents}, "/var/www/html/")
@@ -24,7 +25,7 @@ define('DB_PASSWORD', 'pass');
 			t.Errorf("got error %v; want nil", err)
 		}
 
-		expectedCreds := DatabaseCredentials{User: "user", Pass: "pass", Name: "name"}
+		expectedCreds := DatabaseCredentials{User: "user", Pass: "pass", Name: "name", Host: "localhost"}
 
 		if creds != expectedCreds {
 			t.Errorf("got %v; want %v", creds, expectedCreds)
@@ -76,8 +77,9 @@ define('DB_PASSWORD', 'pass');
 				define('DB_USER', 'user');
 				define('DB_PASSWORD', 'pass');
 				define('DB_NAME', 'dbname');
+				define('DB_HOST', 'localhost');
 				`,
-				DatabaseCredentials{"user", "pass", "dbname"},
+				DatabaseCredentials{"user", "pass", "dbname", "localhost"},
 			},
 			{
 				"spaces",
@@ -88,8 +90,9 @@ define('DB_PASSWORD', 'pass');
 				define(   'DB_PASSWORD',   'pass'   );
 				// No spaces
 				define('DB_NAME','dbname');
+				define('DB_HOST','localhost');
 				`,
-				DatabaseCredentials{"user", "pass", "dbname"},
+				DatabaseCredentials{"user", "pass", "dbname", "localhost"},
 			},
 			{
 				"double quotes",
@@ -97,8 +100,9 @@ define('DB_PASSWORD', 'pass');
 				define( "DB_USER", "user" );
 				define( "DB_PASSWORD", "pass" );
 				define( "DB_NAME", "dbname" );
+				define( "DB_HOST", "localhost" );
 				`,
-				DatabaseCredentials{"user", "pass", "dbname"},
+				DatabaseCredentials{"user", "pass", "dbname", "localhost"},
 			},
 			{
 				"quote usage in values",
@@ -106,8 +110,9 @@ define('DB_PASSWORD', 'pass');
 				define('DB_USER', 'us"er');
 				define('DB_PASSWORD', "pa'ss");
 				define('DB_NAME', 'dbname');
+				define('DB_HOST', 'localhost');
 				`,
-				DatabaseCredentials{"us\"er", "pa'ss", "dbname"},
+				DatabaseCredentials{"us\"er", "pa'ss", "dbname", "localhost"},
 			},
 		}
 

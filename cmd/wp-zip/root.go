@@ -2,14 +2,11 @@ package wp_zip
 
 import (
 	"errors"
-	"fmt"
 	"github.com/jfortunato/wp-zip/internal/packager"
 	"github.com/jfortunato/wp-zip/internal/sftp"
 	"github.com/jfortunato/wp-zip/internal/types"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
 	"log"
-	"syscall"
 )
 
 type VersionDetails struct {
@@ -36,7 +33,6 @@ func init() {
 	rootCmd.Flags().StringVarP(&Webroot, "webroot", "w", "", "Path to the public directory of the live site")
 	rootCmd.MarkFlagRequired("host")
 	rootCmd.MarkFlagRequired("username")
-	rootCmd.MarkFlagRequired("domain")
 	rootCmd.MarkFlagRequired("webroot")
 
 }
@@ -52,7 +48,8 @@ var rootCmd = &cobra.Command{
 		// If the user didn't provide a password, then prompt for it
 		// Run in a loop until the user provides a password
 		for Password == "" {
-			Password = promptForPassword()
+			prompter := &packager.RuntimePrompter{}
+			Password = prompter.PromptForPassword("Enter SFTP password: ")
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
@@ -77,16 +74,6 @@ func argsValidation() cobra.PositionalArgs {
 
 		return nil
 	}
-}
-
-func promptForPassword() string {
-	fmt.Println("Enter sftp password: ")
-	password, err := terminal.ReadPassword(int(syscall.Stdin))
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	return string(password)
 }
 
 func Execute(v VersionDetails) {

@@ -1,6 +1,6 @@
 FROM wordpress
 
-RUN apt update && apt install openssh-server -y
+RUN apt update && apt install openssh-server default-mysql-client -y
 
 # Download wp-cli so we can install wordpress
 RUN curl https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -o /tmp/wp-cli.phar

@@ -11,6 +11,7 @@ type DatabaseCredentials struct {
 	User string
 	Pass string
 	Name string
+	Host string
 }
 
 type HttpGetter interface {
