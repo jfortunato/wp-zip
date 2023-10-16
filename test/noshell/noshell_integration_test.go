@@ -21,7 +21,7 @@ const (
 	DOCUMENT_ROOT        = "/html"
 )
 
-func TestZipFileCreated(t *testing.T) {
+func TestZipFileCreatedNoShell(t *testing.T) {
 	containers := test.StartComposeContainers(t, test.DefaultComposeRequest(PATH_TO_COMPOSE_FILE))
 
 	url, _ := types.NewSiteUrl("http://localhost:" + containers["wordpress"].MappedPort("80/tcp"))
@@ -37,7 +37,7 @@ func TestZipFileCreated(t *testing.T) {
 	test.AssertZipContainsFiles(t, filename, []string{"files/index.php", "files/wp-config.php", "database.sql", "wpmigrate-export.json"})
 }
 
-func TestUploadedFileIsAlwaysDeleted(t *testing.T) {
+func TestUploadedFileIsAlwaysDeletedNoShell(t *testing.T) {
 	containers := test.StartComposeContainers(t, test.DefaultComposeRequest(PATH_TO_COMPOSE_FILE))
 
 	// When an invalid url is passed to the builder, it runs successfully up until it needs to generate the json file

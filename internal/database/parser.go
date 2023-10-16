@@ -18,8 +18,7 @@ var (
 
 // EmitterCredentialsParser is responsible for parsing the database credentials from the wp-config.php file. It uses an Emitter to download the remote file.
 type EmitterCredentialsParser struct {
-	e          Emitter
-	publicPath types.PublicPath
+	e Emitter
 }
 
 // An Emitter is a simpler interface for the emitter.FileEmitter. It is used to download the wp-config.php file.
@@ -28,14 +27,14 @@ type Emitter interface {
 }
 
 // NewEmitterCredentialsParser is a constructor that returns an EmitterCredentialsParser.
-func NewEmitterCredentialsParser(e Emitter, publicPath types.PublicPath) *EmitterCredentialsParser {
-	return &EmitterCredentialsParser{e, publicPath}
+func NewEmitterCredentialsParser(e Emitter) *EmitterCredentialsParser {
+	return &EmitterCredentialsParser{e}
 }
 
 // ParseDatabaseCredentials is the main function of the EmitterCredentialsParser. It downloads the wp-config.php file and parses the database credentials from it.
-func (p *EmitterCredentialsParser) ParseDatabaseCredentials() (DatabaseCredentials, error) {
+func (p *EmitterCredentialsParser) ParseDatabaseCredentials(publicPath types.PublicPath) (DatabaseCredentials, error) {
 	// Download/read the wp-config.php file
-	contents, err := p.fetchWPConfigContents()
+	contents, err := p.fetchWPConfigContents(publicPath)
 	if err != nil {
 		return DatabaseCredentials{}, fmt.Errorf("%w: %s", ErrCouldNotReadWPConfig, err)
 	}
@@ -44,9 +43,9 @@ func (p *EmitterCredentialsParser) ParseDatabaseCredentials() (DatabaseCredentia
 }
 
 // fetchWPConfigContents downloads the wp-config.php file and returns its full contents.
-func (p *EmitterCredentialsParser) fetchWPConfigContents() (string, error) {
+func (p *EmitterCredentialsParser) fetchWPConfigContents(publicPath types.PublicPath) (string, error) {
 	var wpConfigFileContents string
-	err := p.e.EmitSingle(p.publicPath.String()+"wp-config.php", func(path string, contents io.Reader) {
+	err := p.e.EmitSingle(publicPath.String()+"wp-config.php", func(path string, contents io.Reader) {
 		wpConfigFileContents = readerToString(contents)
 	})
 	if err != nil {

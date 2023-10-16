@@ -42,12 +42,10 @@ func init() {
 	rootCmd.Flags().StringVarP(&Webroot, "webroot", "w", "", "Path to the public directory of the live site")
 	rootCmd.MarkFlagRequired("host")
 	rootCmd.MarkFlagRequired("username")
-	rootCmd.MarkFlagRequired("webroot")
-
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "wp-zip -h sftp-host -u sftp-username -p sftp-password -w path-to-webroot [flags] output-filename",
+	Use:   "wp-zip -h sftp-host -u sftp-username -p sftp-password [flags] output-filename",
 	Short: "Export an existing WordPress site to a zip file",
 	Long: `Generate a complete archive of a WordPress site's files
 	and database, which can be used to migrate the site

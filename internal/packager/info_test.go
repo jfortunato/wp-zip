@@ -98,13 +98,69 @@ func TestDetermineSiteInfo(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("it should determine the public path at runtime if not given", func(t *testing.T) {
+		var tests = []struct {
+			name           string
+			stubbedCmds    map[string]string
+			promptCalls    int
+			wantPublicPath types.PublicPath
+		}{
+			{
+				"find 1 public path",
+				map[string]string{"find -L . -type f -name 'wp-config.php'": "./public/wp-config.php\n"},
+				0,
+				"./public",
+			},
+			{
+				"via prompter if cmd cannot be run",
+				map[string]string{},
+				1,
+				"./path/to/public",
+			},
+			{
+				"no public path found - prompt",
+				map[string]string{"find -L . -type f -name 'wp-config.php'": ""},
+				1,
+				"./path/to/public",
+			},
+			{
+				"multiple public paths found - use none and prompt",
+				map[string]string{"find -L . -type f -name 'wp-config.php'": "./public/wp-config.php\n./public2/wp-config.php\n"},
+				1,
+				"./path/to/public",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				prompter := &PrompterSpy{}
+
+				got, err := DetermineSiteInfo("localhost", "", &CredentialsParserStub{}, &MockCommandRunner{tt.stubbedCmds}, prompter)
+
+				if err != nil {
+					t.Errorf("got error %v; want nil", err)
+				}
+
+				want := SiteInfo{"localhost", tt.wantPublicPath, database.DatabaseCredentials{"user", "pass", "db", "localhost"}}
+				if got != want {
+					t.Errorf("got site info %v; want %v", got, want)
+				}
+
+				// Assert that the prompter was called the correct number of times
+				if prompter.calls != tt.promptCalls {
+					t.Errorf("got %d prompt calls; want %d", prompter.calls, tt.promptCalls)
+				}
+			})
+		}
+	})
 }
 
 type CredentialsParserStub struct {
 	errorStub error
 }
 
-func (p *CredentialsParserStub) ParseDatabaseCredentials() (database.DatabaseCredentials, error) {
+func (p *CredentialsParserStub) ParseDatabaseCredentials(publicPath types.PublicPath) (database.DatabaseCredentials, error) {
 	return database.DatabaseCredentials{"user", "pass", "db", "localhost"}, p.errorStub
 }
 
@@ -114,7 +170,15 @@ type PrompterSpy struct {
 
 func (p *PrompterSpy) Prompt(question string) string {
 	p.calls++
-	return "http://prompted-localhost"
+
+	switch question {
+	case "What is the site url?":
+		return "http://prompted-localhost"
+	case "What is the public path?":
+		return "./path/to/public"
+	}
+
+	return ""
 }
 
 type MockCommandRunner struct {

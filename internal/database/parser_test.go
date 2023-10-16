@@ -17,9 +17,9 @@ define('DB_PASSWORD', 'pass');
 define('DB_HOST', 'localhost');
 `
 
-		parser := NewEmitterCredentialsParser(&EmitterStub{contentsToEmit: contents}, "/var/www/html/")
+		parser := NewEmitterCredentialsParser(&EmitterStub{contentsToEmit: contents})
 
-		creds, err := parser.ParseDatabaseCredentials()
+		creds, err := parser.ParseDatabaseCredentials("/var/www/html/")
 
 		if err != nil {
 			t.Errorf("got error %v; want nil", err)
@@ -44,9 +44,9 @@ define('DB_HOST', 'localhost');
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				parser := NewEmitterCredentialsParser(&EmitterStub{errorStub: tt.emitterError}, "/var/www/html/")
+				parser := NewEmitterCredentialsParser(&EmitterStub{errorStub: tt.emitterError})
 
-				_, err := parser.ParseDatabaseCredentials()
+				_, err := parser.ParseDatabaseCredentials("/var/www/html/")
 
 				if !errors.Is(err, ErrCouldNotReadWPConfig) {
 					t.Errorf("got error %v; want ErrCouldNotReadWPConfig", err)
@@ -56,9 +56,9 @@ define('DB_HOST', 'localhost');
 	})
 
 	t.Run("it should return an error if the credentials cant be extracted from the file", func(t *testing.T) {
-		parser := NewEmitterCredentialsParser(&EmitterStub{contentsToEmit: "some contents that don't contain creds"}, "/var/www/html/")
+		parser := NewEmitterCredentialsParser(&EmitterStub{contentsToEmit: "some contents that don't contain creds"})
 
-		_, err := parser.ParseDatabaseCredentials()
+		_, err := parser.ParseDatabaseCredentials("/var/www/html/")
 
 		if !errors.Is(err, ErrCantFindCredentials) {
 			t.Errorf("got error %v; want ErrCantFindCredentials", err)
@@ -118,9 +118,9 @@ define('DB_HOST', 'localhost');
 
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
-				parser := NewEmitterCredentialsParser(&EmitterStub{contentsToEmit: test.contents}, "/var/www/html/")
+				parser := NewEmitterCredentialsParser(&EmitterStub{contentsToEmit: test.contents})
 
-				creds, err := parser.ParseDatabaseCredentials()
+				creds, err := parser.ParseDatabaseCredentials("/var/www/html/")
 
 				if err != nil {
 					t.Errorf("got error %v; want nil", err)

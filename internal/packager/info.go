@@ -23,13 +23,23 @@ type SiteInfo struct {
 }
 
 type CredentialsParser interface {
-	ParseDatabaseCredentials() (database.DatabaseCredentials, error)
+	ParseDatabaseCredentials(publicPath types.PublicPath) (database.DatabaseCredentials, error)
 }
 
 // DetermineSiteInfo determines the site info needed to package a WordPress site. Some of the information is determined at runtime, such as the database credentials.
 func DetermineSiteInfo(siteUrl types.SiteUrl, publicPath types.PublicPath, parser CredentialsParser, runner sftp.RemoteCommandRunner, prompter Prompter) (SiteInfo, error) {
+	var err error
+
+	// If the publicPath is empty, we need to determine it at runtime
+	if publicPath == "" {
+		publicPath, err = determinePublicPath(runner, prompter)
+		if err != nil {
+			return SiteInfo{}, err
+		}
+	}
+
 	// We need to determine the database credentials at runtime
-	credentials, err := parser.ParseDatabaseCredentials()
+	credentials, err := parser.ParseDatabaseCredentials(publicPath)
 	if err != nil {
 		return SiteInfo{}, ErrCannotParseCredentials
 	}
@@ -40,11 +50,6 @@ func DetermineSiteInfo(siteUrl types.SiteUrl, publicPath types.PublicPath, parse
 		if err != nil {
 			return SiteInfo{}, err
 		}
-	}
-
-	// If the publicPath is empty, we need to determine it at runtime
-	if publicPath == "" {
-		return SiteInfo{}, errors.New("publicPath cannot be empty")
 	}
 
 	return SiteInfo{
@@ -95,4 +100,43 @@ func promptForSiteUrl(prompter Prompter) (types.SiteUrl, error) {
 		return "", err
 	}
 	return u, nil
+}
+
+func determinePublicPath(runner sftp.RemoteCommandRunner, prompter Prompter) (types.PublicPath, error) {
+	cmd := `find -L . -type f -name 'wp-config.php'`
+
+	var publicPath types.PublicPath
+
+	if runner.CanRunRemoteCommand(cmd) {
+		output, err := runner.RunRemoteCommand(cmd)
+		if err != nil {
+			return "", err
+		}
+		// If there are multiple results, we don't want to guess which one is the correct one, so we'll prompt for the public path
+		// We'll determine that there are multiple results by counting the number of newlines in the output
+		b, _ := io.ReadAll(output)
+		totalNewLines := strings.Count(string(b), "\n")
+		if totalNewLines <= 1 {
+			str := strings.TrimSpace(string(b))
+			publicPath = types.PublicPath(strings.TrimSuffix(str, "/wp-config.php"))
+		}
+	}
+
+	if publicPath == "" {
+		var err error
+		publicPath, err = promptForPublicPath(prompter)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return publicPath, nil
+}
+
+func promptForPublicPath(prompter Prompter) (types.PublicPath, error) {
+	response := prompter.Prompt("What is the public path?")
+	if response == "" {
+		return "", errors.New("public path cannot be empty")
+	}
+	return types.PublicPath(response), nil
 }
