@@ -2,13 +2,19 @@
 
 Quickly archive a live WordPress site to a local zip file.
 
+## Installation
+
+### via Prebuilt Binaries
+
+Prebuilt binaries are available for Linux, macOS, and Windows. You can download them from the [releases page](https://github.com/jfortunato/wp-zip/releases/latest).
+
 ## Usage
 
 ```bash
-wp-zip -h <sftp-host> -u <sftp-user> -p <sftp-password> output.zip
+wp-zip -h <sftp-host> -u <sftp-user> output.zip
 ```
 
-You must already have access to the site via SFTP. The path to the public directory (where wp-config.php lives) should be automatically detected, but if it can't, you will be prompted for it.
+You will be prompted for the sftp password (if `-p` flag not given). You must already have access to the site via SFTP. The path to the public directory (where wp-config.php lives) should be automatically detected, but if it can't, you will be prompted for it.
 
 ## Importing with LocalWP
 
