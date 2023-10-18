@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/jfortunato/wp-zip/compare/v1.0.0...v1.0.1) (2023-10-18)
+
+
+### Bug Fixes
+
+* Remove replace directive in go.mod ([cd591ce](https://github.com/jfortunato/wp-zip/commit/cd591ce003becaf2221058f3a016eadac1156684))
+
 ## [1.0.0](https://github.com/jfortunato/wp-zip/compare/v0.2.0...v1.0.0) (2023-10-18)
 
 
