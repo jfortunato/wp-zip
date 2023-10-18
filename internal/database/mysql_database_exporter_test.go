@@ -88,7 +88,8 @@ func TestMysqldumpDatabaseExporter_Export(t *testing.T) {
 
 				r, _ := exporter.Export()
 
-				if readerToString(r) != expectedOutput {
+				str, _ := io.ReadAll(r)
+				if string(str) != expectedOutput {
 					t.Errorf("exporter.Export() returned %s; want %s", r, expectedOutput)
 				}
 			})

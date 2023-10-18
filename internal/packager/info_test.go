@@ -3,6 +3,7 @@ package packager
 import (
 	"errors"
 	"github.com/jfortunato/wp-zip/internal/database"
+	"github.com/jfortunato/wp-zip/internal/parser"
 	"github.com/jfortunato/wp-zip/internal/types"
 	"io"
 	"strings"
@@ -11,7 +12,7 @@ import (
 
 func TestDetermineSiteInfo(t *testing.T) {
 	t.Run("it should return the site info", func(t *testing.T) {
-		got, err := DetermineSiteInfo("localhost", "public", &CredentialsParserStub{}, &MockCommandRunner{}, &PrompterSpy{})
+		got, err := DetermineSiteInfo("localhost", "public", newConfigParserStub(), &MockCommandRunner{}, &PrompterSpy{})
 
 		if err != nil {
 			t.Errorf("got error %v; want nil", err)
@@ -24,63 +25,83 @@ func TestDetermineSiteInfo(t *testing.T) {
 		}
 	})
 
-	t.Run("it should return an error if the credentials parser fails", func(t *testing.T) {
-		parser := &CredentialsParserStub{errorStub: errors.New("error")}
+	t.Run("it should return an error if the wp config parser fails", func(t *testing.T) {
+		parser := newConfigParserStub()
+		parser.errorStub = errors.New("error")
 
 		_, err := DetermineSiteInfo("localhost", "public", parser, &MockCommandRunner{}, &PrompterSpy{})
 
 		// Assert that we got the error we expect
-		if !errors.Is(err, ErrCannotParseCredentials) {
-			t.Errorf("got error %v; want ErrCannotParseCredentials", err)
+		if !errors.Is(err, ErrCannotParseWPConfig) {
+			t.Errorf("got error %v; want ErrCannotParseWPConfig", err)
 		}
 	})
 
 	t.Run("it should determine the site url at runtime if not given", func(t *testing.T) {
-		cmd := `mysql --user='user' --password='pass' --host=localhost db --skip-column-names --silent -e "SELECT option_value FROM wp_options WHERE option_name = 'siteurl';"`
+		cmds := map[string]string{
+			"default":            `mysql --user='user' --password='pass' --host=localhost db --skip-column-names --silent -e "SELECT option_value FROM wp_options WHERE option_name = 'siteurl';"`,
+			"alternative-prefix": `mysql --user='user' --password='pass' --host=localhost db --skip-column-names --silent -e "SELECT option_value FROM xx_options WHERE option_name = 'siteurl';"`,
+		}
 
 		var tests = []struct {
 			name        string
 			stubbedCmds map[string]string
+			prefix      string
 			promptCalls int
 			wantSiteUrl types.SiteUrl
 		}{
 			{
 				"via database select",
 				map[string]string{
-					cmd: "https://example.com/\n",
+					cmds["default"]: "https://example.com/\n",
 				},
+				"wp_",
 				0,
 				"https://example.com",
 			},
 			{
 				"via prompter if cmd cannot be run",
 				map[string]string{},
+				"wp_",
 				1,
 				"http://prompted-localhost",
 			},
 			{
 				"via prompter if cmd can be run but returns empty string",
 				map[string]string{
-					cmd: "",
+					cmds["default"]: "",
 				},
+				"wp_",
 				1,
 				"http://prompted-localhost",
 			},
 			{
 				"via prompter if cmd can be run but returns invalid url",
 				map[string]string{
-					cmd: "invalid-url",
+					cmds["default"]: "invalid-url",
 				},
+				"wp_",
 				1,
 				"http://prompted-localhost",
+			},
+			{
+				"via database select - alternative prefix",
+				map[string]string{
+					cmds["alternative-prefix"]: "https://example.com/\n",
+				},
+				"xx_",
+				0,
+				"https://example.com",
 			},
 		}
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				prompter := &PrompterSpy{}
+				parser := newConfigParserStub()
+				parser.fieldsStub.Prefix = tt.prefix
 
-				got, err := DetermineSiteInfo("", "public", &CredentialsParserStub{}, &MockCommandRunner{tt.stubbedCmds}, prompter)
+				got, err := DetermineSiteInfo("", "public", parser, &MockCommandRunner{tt.stubbedCmds}, prompter)
 
 				if err != nil {
 					t.Errorf("got error %v; want nil", err)
@@ -136,7 +157,7 @@ func TestDetermineSiteInfo(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				prompter := &PrompterSpy{}
 
-				got, err := DetermineSiteInfo("localhost", "", &CredentialsParserStub{}, &MockCommandRunner{tt.stubbedCmds}, prompter)
+				got, err := DetermineSiteInfo("localhost", "", newConfigParserStub(), &MockCommandRunner{tt.stubbedCmds}, prompter)
 
 				if err != nil {
 					t.Errorf("got error %v; want nil", err)
@@ -156,12 +177,19 @@ func TestDetermineSiteInfo(t *testing.T) {
 	})
 }
 
-type CredentialsParserStub struct {
-	errorStub error
+type ConfigParserStub struct {
+	errorStub  error
+	fieldsStub parser.WPConfigFields
 }
 
-func (p *CredentialsParserStub) ParseDatabaseCredentials(publicPath types.PublicPath) (database.DatabaseCredentials, error) {
-	return database.DatabaseCredentials{"user", "pass", "db", "localhost"}, p.errorStub
+func newConfigParserStub() *ConfigParserStub {
+	return &ConfigParserStub{
+		fieldsStub: parser.WPConfigFields{Credentials: database.DatabaseCredentials{"user", "pass", "db", "localhost"}, Prefix: "wp_"},
+	}
+}
+
+func (p *ConfigParserStub) ParseWPConfig(publicPath types.PublicPath) (parser.WPConfigFields, error) {
+	return p.fieldsStub, p.errorStub
 }
 
 type PrompterSpy struct {

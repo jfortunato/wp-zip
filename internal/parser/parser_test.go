@@ -1,7 +1,8 @@
-package database
+package parser
 
 import (
 	"errors"
+	"github.com/jfortunato/wp-zip/internal/database"
 	"github.com/jfortunato/wp-zip/internal/emitter"
 	"strings"
 	"testing"
@@ -15,20 +16,48 @@ define('DB_NAME', 'name');
 define('DB_USER', 'user');
 define('DB_PASSWORD', 'pass');
 define('DB_HOST', 'localhost');
+
+$table_prefix = 'wp_';
 `
 
 		parser := NewEmitterCredentialsParser(&EmitterStub{contentsToEmit: contents})
 
-		creds, err := parser.ParseDatabaseCredentials("/var/www/html/")
+		fields, err := parser.ParseWPConfig("/var/www/html/")
 
 		if err != nil {
 			t.Errorf("got error %v; want nil", err)
 		}
 
-		expectedCreds := DatabaseCredentials{User: "user", Pass: "pass", Name: "name", Host: "localhost"}
+		expectedCreds := database.DatabaseCredentials{User: "user", Pass: "pass", Name: "name", Host: "localhost"}
 
-		if creds != expectedCreds {
-			t.Errorf("got %v; want %v", creds, expectedCreds)
+		if fields.Credentials != expectedCreds {
+			t.Errorf("got %v; want %v", fields.Credentials, expectedCreds)
+		}
+	})
+
+	t.Run("it should parse the prefix from the wp-config.php file", func(t *testing.T) {
+		contents := `
+<?php
+define('DB_NAME', 'name');
+define('DB_USER', 'user');
+define('DB_PASSWORD', 'pass');
+define('DB_HOST', 'localhost');
+
+$table_prefix  = 'foo_';
+`
+
+		parser := NewEmitterCredentialsParser(&EmitterStub{contentsToEmit: contents})
+
+		fields, err := parser.ParseWPConfig("/var/www/html/")
+
+		if err != nil {
+			t.Errorf("got error %v; want nil", err)
+		}
+
+		expectedPrefix := "foo_"
+
+		if fields.Prefix != expectedPrefix {
+			t.Errorf("got %v; want %v", fields.Prefix, expectedPrefix)
 		}
 	})
 
@@ -46,7 +75,7 @@ define('DB_HOST', 'localhost');
 			t.Run(tt.name, func(t *testing.T) {
 				parser := NewEmitterCredentialsParser(&EmitterStub{errorStub: tt.emitterError})
 
-				_, err := parser.ParseDatabaseCredentials("/var/www/html/")
+				_, err := parser.ParseWPConfig("/var/www/html/")
 
 				if !errors.Is(err, ErrCouldNotReadWPConfig) {
 					t.Errorf("got error %v; want ErrCouldNotReadWPConfig", err)
@@ -58,10 +87,27 @@ define('DB_HOST', 'localhost');
 	t.Run("it should return an error if the credentials cant be extracted from the file", func(t *testing.T) {
 		parser := NewEmitterCredentialsParser(&EmitterStub{contentsToEmit: "some contents that don't contain creds"})
 
-		_, err := parser.ParseDatabaseCredentials("/var/www/html/")
+		_, err := parser.ParseWPConfig("/var/www/html/")
 
 		if !errors.Is(err, ErrCantFindCredentials) {
 			t.Errorf("got error %v; want ErrCantFindCredentials", err)
+		}
+	})
+
+	t.Run("it should return an error if the credentials can be extracted from the file, but the prefix cannot", func(t *testing.T) {
+		contents := `
+<?php
+define('DB_NAME', 'name');
+define('DB_USER', 'user');
+define('DB_PASSWORD', 'pass');
+define('DB_HOST', 'localhost');
+`
+		parser := NewEmitterCredentialsParser(&EmitterStub{contentsToEmit: contents})
+
+		_, err := parser.ParseWPConfig("/var/www/html/")
+
+		if !errors.Is(err, ErrCantFindPrefix) {
+			t.Errorf("got error %v; want ErrCantFindPrefix", err)
 		}
 	})
 
@@ -69,7 +115,7 @@ define('DB_HOST', 'localhost');
 		var tests = []struct {
 			name     string
 			contents string
-			expected DatabaseCredentials
+			expected database.DatabaseCredentials
 		}{
 			{
 				"basic",
@@ -79,7 +125,7 @@ define('DB_HOST', 'localhost');
 				define('DB_NAME', 'dbname');
 				define('DB_HOST', 'localhost');
 				`,
-				DatabaseCredentials{"user", "pass", "dbname", "localhost"},
+				database.DatabaseCredentials{"user", "pass", "dbname", "localhost"},
 			},
 			{
 				"spaces",
@@ -92,7 +138,7 @@ define('DB_HOST', 'localhost');
 				define('DB_NAME','dbname');
 				define('DB_HOST','localhost');
 				`,
-				DatabaseCredentials{"user", "pass", "dbname", "localhost"},
+				database.DatabaseCredentials{"user", "pass", "dbname", "localhost"},
 			},
 			{
 				"double quotes",
@@ -102,7 +148,7 @@ define('DB_HOST', 'localhost');
 				define( "DB_NAME", "dbname" );
 				define( "DB_HOST", "localhost" );
 				`,
-				DatabaseCredentials{"user", "pass", "dbname", "localhost"},
+				database.DatabaseCredentials{"user", "pass", "dbname", "localhost"},
 			},
 			{
 				"quote usage in values",
@@ -112,7 +158,7 @@ define('DB_HOST', 'localhost');
 				define('DB_NAME', 'dbname');
 				define('DB_HOST', 'localhost');
 				`,
-				DatabaseCredentials{"us\"er", "pa'ss", "dbname", "localhost"},
+				database.DatabaseCredentials{"us\"er", "pa'ss", "dbname", "localhost"},
 			},
 			//{
 			//	"docker env",
@@ -128,17 +174,20 @@ define('DB_HOST', 'localhost');
 
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
-				parser := NewEmitterCredentialsParser(&EmitterStub{contentsToEmit: test.contents})
+				// Add the prefix to the contents, we are only testing the credentials here
+				contents := test.contents + "\n$table_prefix  = 'wp_';"
 
-				creds, err := parser.ParseDatabaseCredentials("/var/www/html/")
+				parser := NewEmitterCredentialsParser(&EmitterStub{contentsToEmit: contents})
+
+				fields, err := parser.ParseWPConfig("/var/www/html/")
 
 				if err != nil {
 					t.Errorf("got error %v; want nil", err)
 				}
 
 				// Assert that the credentials are what we expect
-				if creds != test.expected {
-					t.Errorf("got %v; want %v", creds, test.expected)
+				if fields.Credentials != test.expected {
+					t.Errorf("got %v; want %v", fields.Credentials, test.expected)
 				}
 			})
 		}

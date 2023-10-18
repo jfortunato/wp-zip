@@ -3,9 +3,9 @@ package packager
 import (
 	"errors"
 	"fmt"
-	"github.com/jfortunato/wp-zip/internal/database"
 	"github.com/jfortunato/wp-zip/internal/emitter"
 	"github.com/jfortunato/wp-zip/internal/operations"
+	"github.com/jfortunato/wp-zip/internal/parser"
 	"github.com/jfortunato/wp-zip/internal/sftp"
 	"github.com/jfortunato/wp-zip/internal/types"
 	"io"
@@ -46,7 +46,7 @@ func NewPackager(sshCredentials sftp.SSHCredentials, siteUrl types.SiteUrl, publ
 
 	e := emitter.NewFileEmitter(client)
 
-	info, err := DetermineSiteInfo(siteUrl, publicPath, database.NewEmitterCredentialsParser(e), client, &RuntimePrompter{})
+	info, err := DetermineSiteInfo(siteUrl, publicPath, parser.NewEmitterCredentialsParser(e), client, &RuntimePrompter{})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrCannotDetermineSiteInfo, err)
 	}
