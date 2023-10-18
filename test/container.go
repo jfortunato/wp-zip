@@ -74,7 +74,7 @@ func DefaultComposeRequest(pathToComposeFile string) ComposeRequest {
 			{
 				"db",
 				[]wait.Strategy{
-					wait.ForLog("port: 3306  MySQL Community Server - GPL"),
+					wait.ForLog("port: 3306  MySQL Community Server"),
 				},
 			},
 		},

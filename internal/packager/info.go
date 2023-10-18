@@ -41,7 +41,7 @@ func DetermineSiteInfo(siteUrl types.SiteUrl, publicPath types.PublicPath, parse
 	// We need to determine the database credentials at runtime
 	credentials, err := parser.ParseDatabaseCredentials(publicPath)
 	if err != nil {
-		return SiteInfo{}, ErrCannotParseCredentials
+		return SiteInfo{}, fmt.Errorf("%w: %s", ErrCannotParseCredentials, err)
 	}
 
 	// If the siteUrl is empty, we need to determine it at runtime

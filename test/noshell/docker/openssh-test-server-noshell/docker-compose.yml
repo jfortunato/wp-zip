@@ -16,7 +16,7 @@ services:
       WORDPRESS_DB_NAME: some_db_name
 
   db:
-    image: mysql:8.0-debian
+    image: mysql:5.7-debian
     environment:
       MYSQL_DATABASE: some_db_name
       MYSQL_USER: exampleuser

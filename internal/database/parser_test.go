@@ -114,6 +114,16 @@ define('DB_HOST', 'localhost');
 				`,
 				DatabaseCredentials{"us\"er", "pa'ss", "dbname", "localhost"},
 			},
+			//{
+			//	"docker env",
+			//	`<?php
+			//	define('DB_USER', getenv_docker('WORDPRESS_DB_USER', 'default-user'));
+			//	define('DB_PASSWORD', getenv_docker('WORDPRESS_DB_PASSWORD', 'default-pass'));
+			//	define('DB_NAME', getenv_docker('WORDPRESS_DB_NAME', 'default-dbname'));
+			//	define('DB_HOST', getenv_docker('WORDPRESS_DB_HOST', 'default-localhost'));
+			//	`,
+			//	DatabaseCredentials{"user", "pass", "dbname", "localhost"},
+			//},
 		}
 
 		for _, test := range tests {

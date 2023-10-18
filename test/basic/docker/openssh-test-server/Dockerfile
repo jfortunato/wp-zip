@@ -1,4 +1,4 @@
-FROM wordpress
+FROM wordpress:php7.2-apache
 
 RUN apt update && apt install openssh-server default-mysql-client -y
 
