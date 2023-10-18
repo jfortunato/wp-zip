@@ -8,6 +8,14 @@ Quickly archive a live WordPress site to a local zip file.
 
 Prebuilt binaries are available for Linux, macOS, and Windows. You can download them from the [releases page](https://github.com/jfortunato/wp-zip/releases/latest).
 
+### via Go Install
+
+If you have Go installed, you can install `wp-zip` with the following command:
+
+```bash
+go install github.com/jfortunato/wp-zip@latest
+```
+
 ## Usage
 
 ```bash
