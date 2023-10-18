@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.0](https://github.com/jfortunato/wp-zip/compare/v0.2.0...v1.0.0) (2023-10-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* Use site-url instead of domain
+* Major refactor that splits responsibilities more logically
+
+### Features
+
+* Ability to export database without shell access ([ef738e5](https://github.com/jfortunato/wp-zip/commit/ef738e5e43189fc7b9be45ffbeeea277a8149c02))
+* Auto detect site-url/domain at runtime ([c1f3f82](https://github.com/jfortunato/wp-zip/commit/c1f3f8291e84eedaf5096984ddcd01bb21626421))
+* Auto detect webroot at runtime ([0031c34](https://github.com/jfortunato/wp-zip/commit/0031c34b6a460c2c1eb6b857dc6e5a6b47ecefb1))
+* Parse table prefix from wp-config dynamically ([456e41b](https://github.com/jfortunato/wp-zip/commit/456e41be11e6d7d4089cfb33d5d4616dabea4ed2))
+* Prompt for password if not given ([4cde8e5](https://github.com/jfortunato/wp-zip/commit/4cde8e521f994e407319ccfb86d02c8ac01f04a7))
+
+
+### Code Refactoring
+
+* Major refactor that splits responsibilities more logically ([9802d70](https://github.com/jfortunato/wp-zip/commit/9802d70f55e1768cb32814d81ac3ae5fbea28430))
+* Use site-url instead of domain ([8e37e93](https://github.com/jfortunato/wp-zip/commit/8e37e93ea872336447edac6970e7ff48a915ccc8))
+
 ## [0.2.0](https://github.com/jfortunato/wp-zip/compare/v0.1.1...v0.2.0) (2023-09-25)
 
 
