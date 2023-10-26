@@ -1,5 +1,11 @@
 # wp-zip
 
+![Release Version](https://img.shields.io/github/v/release/jfortunato/wp-zip)
+[![Tests Status](https://github.com/jfortunato/wp-zip/actions/workflows/run-tests.yaml/badge.svg
+)](https://github.com/jfortunato/wp-zip/actions/workflows/run-tests.yaml)
+[![codecov](https://codecov.io/gh/jfortunato/wp-zip/graph/badge.svg?token=ZNZN0I2Y52)](https://codecov.io/gh/jfortunato/wp-zip)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jfortunato/wp-zip)](https://goreportcard.com/report/github.com/jfortunato/wp-zip)
+
 Quickly archive a live WordPress site to a local zip file.
 
 ## Installation
