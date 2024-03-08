@@ -17,6 +17,11 @@ services:
 
   db:
     image: mysql:5.7-debian
+    # https://github.com/docker-library/mysql/issues/873#issuecomment-1909948195:
+    ulimits:
+      nofile: # Fix memory leak issue on some systems when LimitCORE=infinity (containerd)
+        soft: 1048576
+        hard: 1048576
     environment:
       MYSQL_DATABASE: some_db_name
       MYSQL_USER: exampleuser
